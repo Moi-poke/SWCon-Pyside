@@ -1,3 +1,9 @@
+# Requirements
+
+- python 3.10
+- pip install requirements.txt
+- mainwindow.pyを起動
+
 # Todo
 
 ## メインウィンドウ
