@@ -4,7 +4,6 @@ import os
 import queue
 import sys
 import time
-from imaplib import Commands
 from logging import getLogger
 from typing import Optional
 
@@ -18,12 +17,12 @@ from PySide6.QtWidgets import QApplication, QMainWindow
 from Commands.CommandBase import CommandBase
 from Commands.MCU.mcu_command_base import McuCommand
 from libs import sender
-from libs.CommandLoader import CommandLoader
-from libs.Utility import ospath
 from libs.capture import CaptureWorker
+from libs.CommandLoader import CommandLoader
 from libs.game_pad_connect import GamepadController
-from libs.keys import Button, KeyPress, Hat, Direction, Stick
+from libs.keys import Button, Direction, Hat, KeyPress, Stick
 from libs.settings import Setting
+from libs.Utility import ospath
 from ui.main_ui import Ui_MainWindow
 from ui.QtextLogger import QPlainTextEditLogger
 
@@ -36,9 +35,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     stop_request = Signal(bool)
 
     def __init__(
-            self,
-            parent: Optional[PySide6.QtWidgets.QWidget] = None,
-            flags: PySide6.QtCore.Qt.WindowFlags = QtCore.Qt.Window,
+        self,
+        parent: Optional[PySide6.QtWidgets.QWidget] = None,
+        flags: PySide6.QtCore.Qt.WindowFlags = QtCore.Qt.Window,
     ) -> None:
         """_summary_
 
@@ -276,9 +275,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def stick_control(self, left_horizontal, left_vertical, right_horizontal, right_vertical):
         dead_zone = 0.05  # これ以下の傾きは無視(デッドゾーン)
         left_angle = -math.degrees(math.atan2(left_vertical, left_horizontal))
-        left_r = math.sqrt(left_vertical ** 2 + left_horizontal ** 2)
+        left_r = math.sqrt(left_vertical**2 + left_horizontal**2)
         right_angle = -math.degrees(math.atan2(right_vertical, right_horizontal))
-        right_r = math.sqrt(right_vertical ** 2 + right_horizontal ** 2)
+        right_r = math.sqrt(right_vertical**2 + right_horizontal**2)
 
         # print(left_r, right_r)
         if left_r < dead_zone:
@@ -288,8 +287,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # print(left_angle, left_r)
 
-        self.keyPress.input([Direction(Stick.LEFT, left_angle, left_r),
-                             Direction(Stick.RIGHT, right_angle, right_r)])
+        self.keyPress.input([Direction(Stick.LEFT, left_angle, left_r), Direction(Stick.RIGHT, right_angle, right_r)])
 
     def gamepad_l_stick(self):
         if self.setting.setting["key_config"]["joystick"]["direction"]["LStick"]:
@@ -324,8 +322,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.lineEditFPS.textChanged.connect(self.assign_fps_to_setting)
         self.lineEditCameraID.textChanged.connect(self.assign_camera_id_to_setting)
         self.lineEditComPort.textChanged.connect(self.assign_com_port_to_setting)
-
-
 
     def assign_fps_to_setting(self):
         self.setting.setting["main_window"]["must"]["fps"] = self.lineEditFPS.text()
@@ -386,9 +382,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         pass
 
     def load_commands(self):
-        self.py_loader = CommandLoader(ospath('Commands/Python'),
-                                       CommandBase)  # コマンドの読み込み
-        self.mcu_loader = CommandLoader(ospath('Commands/MCU'), McuCommand)
+        self.py_loader = CommandLoader(ospath("Commands/Python"), CommandBase)  # コマンドの読み込み
+        self.mcu_loader = CommandLoader(ospath("Commands/MCU"), McuCommand)
         self.py_classes = self.py_loader.load()
         self.mcu_classes = self.mcu_loader.load()
         self.set_command_items()
@@ -556,12 +551,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.lineEditComPort.setText(str(self.setting.setting["main_window"]["must"]["com_port"]))
 
         self.keymap = {
-                          v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["button"].items() if
-                          v["state"]
-                      } | {
-                          v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["hat"].items() if
-                          v["state"]
-                      }
+            v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["button"].items() if v["state"]
+        } | {v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["hat"].items() if v["state"]}
 
     def closeEvent(self, event: PySide6.QtGui.QCloseEvent) -> None:
         self.setting.save()

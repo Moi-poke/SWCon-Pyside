@@ -1,2 +1,3 @@
 /.qt_for_python/uic/
 /.idea/
+*.pyc

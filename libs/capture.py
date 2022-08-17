@@ -2,14 +2,13 @@ import logging
 import os
 import threading
 import time
+from multiprocessing import Array, Process, shared_memory
 
 import cv2
 import numpy
 import numpy as np
-from PySide6.QtCore import Signal, QObject
-from PySide6.QtGui import QImage
 from PySide6.QtCore import QObject, QSize, Qt, QThread, Signal, Slot
-from multiprocessing import shared_memory, Array, Process
+from PySide6.QtGui import QImage
 
 
 class CaptureWorker(QObject):
@@ -64,7 +63,7 @@ class CaptureWorker(QObject):
             self.destroy()
 
         if self.camera is None or self.camera_id != camera_id:
-            if os.name == 'nt':
+            if os.name == "nt":
                 self.debug("NT OS")
                 self.camera = cv2.VideoCapture(camera_id, cv2.CAP_DSHOW)
             # self.camera = cv2.VideoCapture(cameraId)

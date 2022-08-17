@@ -16,4 +16,9 @@ class ScaledLabel(QtWidgets.QLabel):
         if not pixmap:
             return
         self._pixmap = pixmap
-        return QtWidgets.QLabel.setPixmap(self, self._pixmap.scaled(self.frameSize(), QtCore.Qt.KeepAspectRatio))
+        return QtWidgets.QLabel.setPixmap(
+            self,
+            self._pixmap.scaled(
+                self.frameSize(), QtCore.Qt.KeepAspectRatio, QtCore.Qt.TransformationMode.SmoothTransformation
+            ),
+        )
