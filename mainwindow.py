@@ -26,7 +26,7 @@ from libs.Utility import ospath
 from ui.main_ui import Ui_MainWindow
 from ui.QtextLogger import QPlainTextEditLogger
 
-VERSION = "0.1 beta"
+VERSION = "0.1.1 beta"
 Author = "Moi"
 
 # Todo
@@ -317,6 +317,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pushButton_PythonStop.pressed.connect(self.stop_command)
         self.pushButton_PythonReload.clicked.connect(self.reload_commands)
         self.pushButton_MCUReload.clicked.connect(self.reload_commands)
+        self.pushButtonReloadPort.clicked.connect(self.activate_serial)
         self.tabWidget.currentChanged.connect(self.set_command_mode)
         # Setting.tomlへの保存
         self.lineEditFPS.textChanged.connect(self.assign_fps_to_setting)
@@ -373,8 +374,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.keyPress = None
             self.activate_serial()
         else:
-            if self.ser.openSerial(3, ""):
-                self.logger.debug("COM Port " + str(3) + " connected successfully")
+            if self.ser.openSerial(self.setting.setting["main_window"]["must"]["com_port"], ""):
+                self.logger.debug(
+                    "COM Port "
+                    + str(self.setting.setting["main_window"]["must"]["com_port"])
+                    + " connected successfully"
+                )
                 self.keyPress = KeyPress(self.ser)
         pass
 
