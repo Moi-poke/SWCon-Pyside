@@ -1,6 +1,3 @@
-app = "VController"
-version = "0.1 beta"
-
 [main_window]
 show_camera_realtime = false
 show_serial = false
@@ -9,6 +6,10 @@ tab = "python"
 
 [line]
 token_1 = "ここにLINE通知用のtokenを貼付"
+
+[command]
+py_command = "ABXY連打"
+mcu_command = ""
 
 [main_window.must]
 fps = "60"

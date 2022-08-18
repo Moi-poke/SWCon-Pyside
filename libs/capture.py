@@ -2,6 +2,7 @@ import logging
 import os
 import threading
 import time
+from datetime import datetime
 from multiprocessing import Array, Process, shared_memory
 
 import cv2
@@ -19,7 +20,6 @@ class CaptureWorker(QObject):
 
     def __init__(self, parent=None, fps=60, camera_id=0):
         super().__init__(parent)
-        self.image_rgb = None
         self.height = 720
         self.width = 1280
         self.fps = 60
@@ -82,6 +82,58 @@ class CaptureWorker(QObject):
             self.camera_id = camera_id
         else:
             self.debug("Same Camera ID")
+
+    def saveCapture(self, filename=None, crop=None, crop_ax=None, img=None, capture_dir="./ScreenShot"):
+        if crop_ax is None:
+            crop_ax = [0, 0, 1280, 720]
+        else:
+            pass
+            # print(crop_ax)
+
+        dt_now = datetime.now()
+        if filename is None or filename == "":
+            filename = dt_now.strftime("%Y-%m-%d_%H-%M-%S") + ".png"
+        else:
+            filename = filename + ".png"
+
+        if crop is None:
+            image = self.frame
+        elif crop is 1 or crop is "1":
+            image = self.frame[crop_ax[1] : crop_ax[3], crop_ax[0] : crop_ax[2]]
+        elif crop is 2 or crop is "2":
+            image = self.frame[crop_ax[1] : crop_ax[1] + crop_ax[3], crop_ax[0] : crop_ax[0] + crop_ax[2]]
+        elif img is not None:
+            image = img
+        else:
+            image = self.frame
+
+        if not os.path.exists(capture_dir):
+            os.makedirs(capture_dir)
+            self.debug("Created Capture folder")
+
+        save_path = os.path.join(capture_dir, filename)
+
+        ret = self.imwrite(save_path, image)
+        if ret:
+            self.debug(f"Capture succeeded: {save_path}")
+        else:
+            self.error(f"Capture Failed.")
+
+    def imwrite(self, filename, img, params=None):
+        try:
+            ext = os.path.splitext(filename)[1]
+            result, n = cv2.imencode(ext, img, params)
+
+            if result:
+                with open(filename, mode="w+b") as f:
+                    n.tofile(f)
+                return True
+            else:
+                return False
+        except Exception as e:
+            print(e)
+            self.error(f"Image Write Error: {e}")
+        return False
 
     def set_fps(self, fps):
         self.fps = int(fps)

@@ -1,4 +1,4 @@
-from Commands.CommandBase import CommandBase
+from libs.CommandBase import CommandBase
 from libs.keys import Button
 
 

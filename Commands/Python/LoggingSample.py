@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from logging import getLogger, DEBUG, NullHandler
+from logging import DEBUG, NullHandler, getLogger
 
-from Commands.CommandBase import CommandBase
+from libs.CommandBase import CommandBase
 
 
 # ログ出力のサンプル
 class LoggingSample(CommandBase):
-    NAME = 'ログ出力のサンプル'
+    NAME = "ログ出力のサンプル"
 
     def __init__(self):
         super().__init__()

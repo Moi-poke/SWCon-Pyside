@@ -1,7 +1,7 @@
 import importlib
 import sys
 
-from libs.Utility import getModuleNames, importAllModules, getClassesInModule
+from libs.Utility import getClassesInModule, getModuleNames, importAllModules
 
 
 class CommandLoader:
@@ -41,7 +41,8 @@ class CommandLoader:
     def getCommandClasses(self):
         classes = []
         for mod in self.modules:
-            classes.extend([c for c in getClassesInModule(mod) \
-                            if issubclass(c, self.base_type) and hasattr(c, 'NAME') and c.NAME])
+            classes.extend(
+                [c for c in getClassesInModule(mod) if issubclass(c, self.base_type) and hasattr(c, "NAME") and c.NAME]
+            )
 
         return classes

@@ -7,7 +7,7 @@ from abc import abstractmethod
 
 import cv2
 import numpy
-from PySide6.QtCore import Signal, QObject, Slot
+from PySide6.QtCore import QObject, Signal, Slot
 
 from libs.keys import Button
 
@@ -28,10 +28,12 @@ class CommandBase(QObject):
     stop_function = Signal(bool)
     get_image = Signal(bool)
 
-    def __init__(self, parent=None, path="./template/") -> None:
+    CAPTURE_DIR = "./ScreenShot"
+    TEMPLATE_PATH = "./template/"
+
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.src = None
-        self.TEMPLATE_PATH = path
         self.isCanceled = False
         self.debug(f"コマンド実行Thread: {threading.get_ident()}")
 
@@ -76,13 +78,31 @@ class CommandBase(QObject):
                 else:
                     raise StopSignal
 
-    def is_contain_template(self, template_path, threshold=0.7, use_gray=False,
-                            show_value=False, show_position=True, show_only_true_rect=True, ms=2000):
+    def check_if_alive(self):
+        if self.isCanceled:
+            # raise exception for exit working thread
+            self.info("Exit from command successfully")
+            # self.stop_function.emit(True)
+            raise StopSignal("exit successfully")
+        else:
+            return True
+
+    def is_contain_template(
+        self,
+        template_path,
+        threshold=0.7,
+        use_gray=False,
+        show_value=False,
+        show_position=True,
+        show_only_true_rect=True,
+        ms=2000,
+    ):
         self.get_image.emit(True)
         src = cv2.cvtColor(self.src, cv2.COLOR_BGR2GRAY) if use_gray else self.src
 
-        template = cv2.imread(self.TEMPLATE_PATH + template_path,
-                              cv2.IMREAD_GRAYSCALE if use_gray else cv2.IMREAD_COLOR)
+        template = cv2.imread(
+            self.TEMPLATE_PATH + template_path, cv2.IMREAD_GRAYSCALE if use_gray else cv2.IMREAD_COLOR
+        )
         w, h = template.shape[1], template.shape[0]
 
         method = cv2.TM_CCOEFF_NORMED
@@ -90,7 +110,7 @@ class CommandBase(QObject):
         _, max_val, _, max_loc = cv2.minMaxLoc(res)
 
         if show_value:
-            print(template_path + ' ZNCC value: ' + str(max_val))
+            print(template_path + " ZNCC value: " + str(max_val))
 
         top_left = max_loc
         bottom_right = (top_left[0] + w + 1, top_left[1] + h + 1)
@@ -106,10 +126,12 @@ class CommandBase(QObject):
 
     def screenshot(self):
         try:
-            self.imwrite("./test.png", self.src)
-            print("capture succeeded:")
+            # self.imwrite("./.png", self.src)
+            # print("capture succeeded:")
+            pass
         except cv2.error as e:
-            print("Capture Failed")
+            # print("Capture Failed")
+            pass
 
     # ログをメインに飛ばすため
     def debug(self, s, force=False):
@@ -144,7 +166,7 @@ class CommandBase(QObject):
             result, n = cv2.imencode(ext, img, params)
 
             if result:
-                with open(filename, mode='w+b') as f:
+                with open(filename, mode="w+b") as f:
                     n.tofile(f)
                 return True
             else:

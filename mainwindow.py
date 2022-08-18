@@ -7,26 +7,27 @@ import time
 from logging import getLogger
 from typing import Optional
 
+import cv2
 import PySide6
 import shiboken6
 from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import QSize, Qt, QThread, Signal, Slot
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtGui import QColor, QImage, QPixmap
 from PySide6.QtWidgets import QApplication, QMainWindow
 
-from Commands.CommandBase import CommandBase
-from Commands.MCU.mcu_command_base import McuCommand
 from libs import sender
 from libs.capture import CaptureWorker
+from libs.CommandBase import CommandBase
 from libs.CommandLoader import CommandLoader
 from libs.game_pad_connect import GamepadController
 from libs.keys import Button, Direction, Hat, KeyPress, Stick
+from libs.mcu_command_base import McuCommand
 from libs.settings import Setting
 from libs.Utility import ospath
 from ui.main_ui import Ui_MainWindow
 from ui.QtextLogger import QPlainTextEditLogger
 
-VERSION = "0.1.1 beta"
+VERSION = "0.2.0 (beta)"
 Author = "Moi"
 
 # Todo
@@ -52,7 +53,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.thread_2 = None
         self.worker = None
         self.GamepadController_worker = None
-        self.GamepadController_thread = None
+        self.GamepadController_thread = QThread()
         self.thread_do = None
         self.img = None
         self.command_mode = None
@@ -62,14 +63,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.setting = Setting()
 
         self.setupUi(self)
-        self.set_settings()
-
-        # self.gamepad_setting = SettingWindow(parent=self, _setting=self.setting)
-        # self.gamepad_setting.show()
-
-        self.q: queue.Queue = queue.Queue()
-        self.setup_functions_connect()
-        self.connect_capture()
+        self.setWindowTitle(f"SWController {VERSION}")
 
         self.pushButtonReloadCamera.pressed.connect(lambda: self.reconnect_camera(self.lineEditCameraID.text()))
         self.pushButtonReloadCamera.pressed.connect(self.reload_camera)
@@ -84,6 +78,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.gridLayout.addWidget(self.plainTextEdit.widget, 0, 0, 1, 1)
         self.setFocus()
+
+        self.set_settings()
+        py_cmd = self.setting.setting["command"]["py_command"]
+        mcu_cmd = self.setting.setting["command"]["mcu_command"]
+
+        # self.gamepad_setting = SettingWindow(parent=self, _setting=self.setting)
+        # self.gamepad_setting.show()
+
+        self.q: queue.Queue = queue.Queue()
+        self.setup_functions_connect()
+        self.connect_capture()
+
         # You can format what is printed to text box
         self.plainTextEdit.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
         # You can control the logging level
@@ -98,6 +104,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.connect_gamepad()
         self.load_commands()
 
+        try:
+            self.comboBox_MCU.setCurrentIndex(self.comboBoxPython.findText(mcu_cmd))
+            self.comboBoxPython.setCurrentIndex(self.comboBoxPython.findText(py_cmd))
+        except Exception as e:
+            self.logger.debug("No Script?")
+
         # スレッドの開始
         self.thread_1.start()
         self.GamepadController_thread.start()
@@ -107,62 +119,76 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.setting.setting["main_window"]["option"]["window_size_width"],
                 self.setting.setting["main_window"]["option"]["window_size_height"],
             )
+        self.pushButton_debug.pressed.connect(self.test)
+
+    def test(self):
+        self.reconnect_gamepad()
 
     # <editor-fold desc="ゲームパッド関連">
     def connect_gamepad(self):
         # Controllerスレッドの作成
-        self.GamepadController_worker = GamepadController()
-        self.GamepadController_thread = QThread()
-        self.GamepadController_worker.moveToThread(self.GamepadController_thread)
-        self.GamepadController_thread.started.connect(self.GamepadController_worker.run)
+        try:
+            self.GamepadController_worker = GamepadController()
+            self.GamepadController_thread = QThread()
+            self.GamepadController_worker.moveToThread(self.GamepadController_thread)
+            self.GamepadController_thread.started.connect(self.GamepadController_worker.run)
 
-        self.GamepadController_worker.set_keymap(self.keymap)
+            self.GamepadController_worker.set_keymap(self.keymap)
 
-        self.GamepadController_worker.ZL_PRESSED.connect(self.press_zl)
-        self.GamepadController_worker.L_PRESSED.connect(self.press_l)
-        self.GamepadController_worker.LCLICK_PRESSED.connect(self.press_lclick)
-        self.GamepadController_worker.MINUS_PRESSED.connect(self.press_minus)
-        self.GamepadController_worker.TOP_PRESSED.connect(self.press_top)
-        self.GamepadController_worker.BTM_PRESSED.connect(self.press_btm)
-        self.GamepadController_worker.LEFT_PRESSED.connect(self.press_left)
-        self.GamepadController_worker.RIGHT_PRESSED.connect(self.press_right)
-        self.GamepadController_worker.CAPTURE_PRESSED.connect(self.press_capture)
-        self.GamepadController_worker.ZR_PRESSED.connect(self.press_zr)
-        self.GamepadController_worker.R_PRESSED.connect(self.press_r)
-        self.GamepadController_worker.RCLICK_PRESSED.connect(self.press_rclick)
-        self.GamepadController_worker.PLUS_PRESSED.connect(self.press_plus)
-        self.GamepadController_worker.A_PRESSED.connect(self.press_a)
-        self.GamepadController_worker.B_PRESSED.connect(self.press_b)
-        self.GamepadController_worker.X_PRESSED.connect(self.press_x)
-        self.GamepadController_worker.Y_PRESSED.connect(self.press_y)
-        self.GamepadController_worker.HOME_PRESSED.connect(self.press_home)
+            self.GamepadController_worker.ZL_PRESSED.connect(self.press_zl)
+            self.GamepadController_worker.L_PRESSED.connect(self.press_l)
+            self.GamepadController_worker.LCLICK_PRESSED.connect(self.press_lclick)
+            self.GamepadController_worker.MINUS_PRESSED.connect(self.press_minus)
+            self.GamepadController_worker.TOP_PRESSED.connect(self.press_top)
+            self.GamepadController_worker.BTM_PRESSED.connect(self.press_btm)
+            self.GamepadController_worker.LEFT_PRESSED.connect(self.press_left)
+            self.GamepadController_worker.RIGHT_PRESSED.connect(self.press_right)
+            self.GamepadController_worker.CAPTURE_PRESSED.connect(self.press_capture)
+            self.GamepadController_worker.ZR_PRESSED.connect(self.press_zr)
+            self.GamepadController_worker.R_PRESSED.connect(self.press_r)
+            self.GamepadController_worker.RCLICK_PRESSED.connect(self.press_rclick)
+            self.GamepadController_worker.PLUS_PRESSED.connect(self.press_plus)
+            self.GamepadController_worker.A_PRESSED.connect(self.press_a)
+            self.GamepadController_worker.B_PRESSED.connect(self.press_b)
+            self.GamepadController_worker.X_PRESSED.connect(self.press_x)
+            self.GamepadController_worker.Y_PRESSED.connect(self.press_y)
+            self.GamepadController_worker.HOME_PRESSED.connect(self.press_home)
 
-        self.GamepadController_worker.ZL_RELEASED.connect(self.release_zl)
-        self.GamepadController_worker.L_RELEASED.connect(self.release_l)
-        self.GamepadController_worker.LCLICK_RELEASED.connect(self.release_lclick)
-        self.GamepadController_worker.MINUS_RELEASED.connect(self.release_minus)
-        self.GamepadController_worker.TOP_RELEASED.connect(self.release_top)
-        self.GamepadController_worker.BTM_RELEASED.connect(self.release_btm)
-        self.GamepadController_worker.LEFT_RELEASED.connect(self.release_left)
-        self.GamepadController_worker.RIGHT_RELEASED.connect(self.release_right)
-        self.GamepadController_worker.CAPTURE_RELEASED.connect(self.release_capture)
-        self.GamepadController_worker.ZR_RELEASED.connect(self.release_zr)
-        self.GamepadController_worker.R_RELEASED.connect(self.release_r)
-        self.GamepadController_worker.RCLICK_RELEASED.connect(self.release_rclick)
-        self.GamepadController_worker.PLUS_RELEASED.connect(self.release_plus)
-        self.GamepadController_worker.A_RELEASED.connect(self.release_a)
-        self.GamepadController_worker.B_RELEASED.connect(self.release_b)
-        self.GamepadController_worker.X_RELEASED.connect(self.release_x)
-        self.GamepadController_worker.Y_RELEASED.connect(self.release_y)
-        self.GamepadController_worker.HOME_RELEASED.connect(self.release_home)
+            self.GamepadController_worker.ZL_RELEASED.connect(self.release_zl)
+            self.GamepadController_worker.L_RELEASED.connect(self.release_l)
+            self.GamepadController_worker.LCLICK_RELEASED.connect(self.release_lclick)
+            self.GamepadController_worker.MINUS_RELEASED.connect(self.release_minus)
+            self.GamepadController_worker.TOP_RELEASED.connect(self.release_top)
+            self.GamepadController_worker.BTM_RELEASED.connect(self.release_btm)
+            self.GamepadController_worker.LEFT_RELEASED.connect(self.release_left)
+            self.GamepadController_worker.RIGHT_RELEASED.connect(self.release_right)
+            self.GamepadController_worker.CAPTURE_RELEASED.connect(self.release_capture)
+            self.GamepadController_worker.ZR_RELEASED.connect(self.release_zr)
+            self.GamepadController_worker.R_RELEASED.connect(self.release_r)
+            self.GamepadController_worker.RCLICK_RELEASED.connect(self.release_rclick)
+            self.GamepadController_worker.PLUS_RELEASED.connect(self.release_plus)
+            self.GamepadController_worker.A_RELEASED.connect(self.release_a)
+            self.GamepadController_worker.B_RELEASED.connect(self.release_b)
+            self.GamepadController_worker.X_RELEASED.connect(self.release_x)
+            self.GamepadController_worker.Y_RELEASED.connect(self.release_y)
+            self.GamepadController_worker.HOME_RELEASED.connect(self.release_home)
 
-        self.GamepadController_worker.AXIS_MOVED.connect(self.stick_control, type=Qt.DirectConnection)
+            self.GamepadController_worker.AXIS_MOVED.connect(self.stick_control, type=Qt.DirectConnection)
 
-        self.gamepad_l_stick()
-        self.gamepad_r_stick()
+            self.gamepad_l_stick()
+            self.gamepad_r_stick()
 
-        self.GamepadController_thread.finished.connect(self.GamepadController_worker.deleteLater)
-        self.GamepadController_thread.finished.connect(self.GamepadController_worker.stop)
+            self.GamepadController_thread.finished.connect(self.GamepadController_worker.deleteLater)
+            self.GamepadController_thread.finished.connect(self.GamepadController_worker.stop)
+
+            if self.GamepadController_worker.no_joystick:
+                self.logger.debug("コントローラー接続なし")
+        except Exception as e:
+            self.logger.error(e)
+
+    def reconnect_gamepad(self):
+        self.GamepadController_worker.connect_joystick()
+        pass
 
     def press_zl(self):
         self.keyPress.input(Button.ZL)
@@ -313,16 +339,28 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.thread_1.finished.connect(self.thread_1.deleteLater)
 
     def setup_functions_connect(self):
+        # 各ボタンの関数割当
         self.pushButton_PythonStart.pressed.connect(self.start_command)
         self.pushButton_PythonStop.pressed.connect(self.stop_command)
         self.pushButton_PythonReload.clicked.connect(self.reload_commands)
         self.pushButton_MCUReload.clicked.connect(self.reload_commands)
         self.pushButtonReloadPort.clicked.connect(self.activate_serial)
+        self.pushButtonScreenShot.clicked.connect(self.screen_shot)
         self.tabWidget.currentChanged.connect(self.set_command_mode)
+
+        # 　各コンボボックス選択時の挙動
+        self.comboBoxPython.currentIndexChanged.connect(self.assign_command)
+        self.comboBox_MCU.currentIndexChanged.connect(self.assign_command)
+
+        # キャプチャ画像クリック時に座標を返すように
+        self.CaptureImageArea.mousePressEvent = self.getPixel
+
         # Setting.tomlへの保存
         self.lineEditFPS.textChanged.connect(self.assign_fps_to_setting)
         self.lineEditCameraID.textChanged.connect(self.assign_camera_id_to_setting)
         self.lineEditComPort.textChanged.connect(self.assign_com_port_to_setting)
+        self.comboBox_MCU.currentIndexChanged.connect(self.assign_mcu_command_to_setting)
+        self.comboBoxPython.currentIndexChanged.connect(self.assign_py_command_to_setting)
 
     def assign_fps_to_setting(self):
         self.setting.setting["main_window"]["must"]["fps"] = self.lineEditFPS.text()
@@ -335,6 +373,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def assign_window_size_to_setting(self):
         self.setting.setting["main_window"]["must"]["com_port"] = self.lineEditComPort.text()
+
+    def assign_mcu_command_to_setting(self):
+        self.setting.setting["command"]["mcu_command"] = self.comboBox_MCU.itemText(self.comboBox_MCU.currentIndex())
+
+    def assign_py_command_to_setting(self):
+        self.setting.setting["command"]["py_command"] = self.comboBoxPython.itemText(self.comboBoxPython.currentIndex())
 
     def resizeEvent(self, event: PySide6.QtGui.QResizeEvent) -> None:
         self.setting.setting["main_window"]["option"]["window_size_width"] = self.width()
@@ -383,6 +427,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.keyPress = KeyPress(self.ser)
         pass
 
+    # Todo キーボード操作できるようにする
     def activate_keyboard(self):
         pass
 
@@ -415,40 +460,66 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def reload_commands(self):
         # 表示しているタブを読み取って、どのコマンドを表示しているか取得、リロード後もそれが選択されるようにする
-        oldval_mcu = self.comboBox_MCU.currentIndex()
-        oldval_py = self.comboBoxPython.currentIndex()
+        oldval_mcu = self.comboBox_MCU.itemText(self.comboBox_MCU.currentIndex())
+        oldval_py = self.comboBoxPython.itemText(self.comboBoxPython.currentIndex())
+
+        self.comboBox_MCU.clear()
+        self.comboBoxPython.clear()
 
         self.py_classes = self.py_loader.reload()
         self.mcu_classes = self.mcu_loader.reload()
 
         # Restore the command selecting state if possible
         self.set_command_items()
-        if oldval_mcu in [self.comboBox_MCU.itemText(i) for i in range(self.comboBox_MCU.count())]:
-            self.comboBox_MCU.setCurrentIndex(oldval_mcu)
-        if oldval_py in [self.comboBoxPython.itemText(i) for i in range(self.comboBoxPython.count())]:
-            self.comboBoxPython.setCurrentIndex(oldval_py)
+        if self.comboBox_MCU.findText(oldval_mcu) != -1:
+            self.comboBox_MCU.setCurrentIndex(self.comboBox_MCU.findText(oldval_mcu))
+        else:
+            self.comboBox_MCU.setCurrentIndex(0)
+
+        if self.comboBoxPython.findText(oldval_py) != -1:
+            self.comboBoxPython.setCurrentIndex(self.comboBoxPython.findText(oldval_py))
+        else:
+            self.comboBoxPython.setCurrentIndex(0)
         self.assign_command()
         self.logger.info("Reloaded commands.")
-
-    def screen_shot(self):
-        pass
 
     def reload_camera(self):
         self.capture_worker.set_fps(self.setting.setting["main_window"]["must"]["fps"])
         pass
 
-    def reload_port(self):
+    def screen_shot(self):
+        try:
+            self.capture_worker.saveCapture(capture_dir=self.cur_command.CAPTURE_DIR)
+        except Exception as e:
+            self.logger.error(e)
+            pass
         pass
+
+    def getPixel(self, event):
+        print(event.type)
+        w = self.CaptureImageArea.width()
+        h = self.CaptureImageArea.height()
+        x = event.position().x()
+        x_ = int(x * 1280 / w)
+        y = event.position().y()
+        y_ = int(y * 720 / h)
+        c = self.img.pixel(x_, y_)
+        # c_qobj = QColor
+        c_rgb = QColor(c).getRgb()
+        self.logger.debug(f"Clicked at x:{x_} y:{y_}, R:{c_rgb[0]} G:{c_rgb[1]} B: {c_rgb[2]}")
+        return x, y, c_rgb
 
     def open_screen_shot_dir(self):
         pass
 
     def start_command(self):
+        self.GamepadController_worker.pause = True
         self.assign_command()
         self.pushButton_PythonStart.setEnabled(False)
         # if self.thread_2 is not None:
         self.stop_command()
-        self.thread_2 = QThread()
+        if self.thread_2 is None:
+            self.thread_2 = QThread()
         self.worker = self.cur_command()
 
         self.worker.moveToThread(self.thread_2)
@@ -485,7 +556,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             # self.stop_request.emit(True)
             # スレッドが作成されていて、削除されていない
             if self.thread_2.isRunning() or not self.thread_2.isFinished():
-                self.worker.get_image.disconnect()
+                # self.worker.get_image.disconnect()
                 print("thread is stopping")
                 self.worker.stop()
                 self.thread_2.quit()
@@ -493,6 +564,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 print("thread is stopped")
                 self.worker = None
                 self.thread_2 = None
+                try:
+                    self.GamepadController_worker.is_alive = True
+                    self.GamepadController_worker.pause = False
+                except:
+                    print("ERROR")
                 # self.callback_stop_command()
 
     @Slot(str, type(logging.DEBUG))
@@ -543,6 +619,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         pass
 
     def set_settings(self):
+
         try:
             self.logger.debug("Load setting")
             self.setting.load()
@@ -561,12 +638,22 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def closeEvent(self, event: PySide6.QtGui.QCloseEvent) -> None:
         self.setting.save()
-        self.thread_1.terminate()
-        self.GamepadController_worker.p.terminate()
-        self.GamepadController_worker.p.join()
-        self.GamepadController_thread.terminate()
-        self.logger.debug("Save settings")
+        try:
+            self.thread_1.terminate()
+            self.thread_2.terminate()
+            # self.GamepadController_worker.p.terminate()
+            # self.GamepadController_worker.p.join()
+        except Exception:
+            pass
+        try:
+            self.GamepadController_worker.p.terminate()
+            self.GamepadController_worker.p.join()
+            self.GamepadController_thread.terminate()
+        except Exception as e:
+            print(000, e)
+            pass
 
+        self.logger.debug("Save settings")
         return super().closeEvent(event)
 
 

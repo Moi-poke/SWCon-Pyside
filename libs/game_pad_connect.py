@@ -1,16 +1,16 @@
 import os
 import sys
+import threading
 import time
+from multiprocessing import Array, Process, shared_memory
 
-import PySide6
 import numpy as np
-from PySide6 import QtWidgets, QtCore, QtGui, QtSerialPort
 import pygame
 import pygame.locals
+import PySide6
+from PySide6 import QtCore, QtGui, QtSerialPort, QtWidgets
 from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QPushButton
-
-from multiprocessing import shared_memory, Array, Process
 
 from libs.settings import Setting
 from ui.key_config import Ui_Form
@@ -155,10 +155,9 @@ class SettingWindow(QtWidgets.QWidget, Ui_Form):
         self.joystick.init()
         self.setWindowTitle(self.joystick.get_name())
         self.hat_prev = 0
-        self.keymap = {v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["button"].items() if
-                       v["state"]} | {
-                          v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["hat"].items() if
-                          v["state"]}
+        self.keymap = {
+            v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["button"].items() if v["state"]
+        } | {v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["hat"].items() if v["state"]}
         # print(self.keymap)
 
         self.Controller_worker = GamepadController()
@@ -253,33 +252,52 @@ class SettingWindow(QtWidgets.QWidget, Ui_Form):
         self.lineEdit_18.setText(self.controller_setting["button"]["HOME"]["assign"])
 
     def set_state(self):
-        if self.controller_setting["button"]["ZL"]["state"]: self.checkBox.toggle()
-        if self.controller_setting["button"]["L"]["state"]: self.checkBox_2.toggle()
-        if self.controller_setting["button"]["LCLICK"]["state"]: self.checkBox_3.toggle()
-        if self.controller_setting["button"]["MINUS"]["state"]: self.checkBox_4.toggle()
-        if self.controller_setting["hat"]["TOP"]["state"]: self.checkBox_5.toggle()
-        if self.controller_setting["hat"]["BTM"]["state"]: self.checkBox_6.toggle()
-        if self.controller_setting["hat"]["LEFT"]["state"]: self.checkBox_7.toggle()
-        if self.controller_setting["hat"]["RIGHT"]["state"]: self.checkBox_8.toggle()
-        if self.controller_setting["button"]["CAPTURE"]["state"]: self.checkBox_9.toggle()
-        if self.controller_setting["button"]["ZR"]["state"]: self.checkBox_10.toggle()
-        if self.controller_setting["button"]["R"]["state"]: self.checkBox_11.toggle()
-        if self.controller_setting["button"]["RCLICK"]["state"]: self.checkBox_12.toggle()
-        if self.controller_setting["button"]["PLUS"]["state"]: self.checkBox_13.toggle()
-        if self.controller_setting["button"]["A"]["state"]: self.checkBox_14.toggle()
-        if self.controller_setting["button"]["B"]["state"]: self.checkBox_15.toggle()
-        if self.controller_setting["button"]["X"]["state"]: self.checkBox_16.toggle()
-        if self.controller_setting["button"]["Y"]["state"]: self.checkBox_17.toggle()
-        if self.controller_setting["button"]["HOME"]["state"]: self.checkBox_18.toggle()
+        if self.controller_setting["button"]["ZL"]["state"]:
+            self.checkBox.toggle()
+        if self.controller_setting["button"]["L"]["state"]:
+            self.checkBox_2.toggle()
+        if self.controller_setting["button"]["LCLICK"]["state"]:
+            self.checkBox_3.toggle()
+        if self.controller_setting["button"]["MINUS"]["state"]:
+            self.checkBox_4.toggle()
+        if self.controller_setting["hat"]["TOP"]["state"]:
+            self.checkBox_5.toggle()
+        if self.controller_setting["hat"]["BTM"]["state"]:
+            self.checkBox_6.toggle()
+        if self.controller_setting["hat"]["LEFT"]["state"]:
+            self.checkBox_7.toggle()
+        if self.controller_setting["hat"]["RIGHT"]["state"]:
+            self.checkBox_8.toggle()
+        if self.controller_setting["button"]["CAPTURE"]["state"]:
+            self.checkBox_9.toggle()
+        if self.controller_setting["button"]["ZR"]["state"]:
+            self.checkBox_10.toggle()
+        if self.controller_setting["button"]["R"]["state"]:
+            self.checkBox_11.toggle()
+        if self.controller_setting["button"]["RCLICK"]["state"]:
+            self.checkBox_12.toggle()
+        if self.controller_setting["button"]["PLUS"]["state"]:
+            self.checkBox_13.toggle()
+        if self.controller_setting["button"]["A"]["state"]:
+            self.checkBox_14.toggle()
+        if self.controller_setting["button"]["B"]["state"]:
+            self.checkBox_15.toggle()
+        if self.controller_setting["button"]["X"]["state"]:
+            self.checkBox_16.toggle()
+        if self.controller_setting["button"]["Y"]["state"]:
+            self.checkBox_17.toggle()
+        if self.controller_setting["button"]["HOME"]["state"]:
+            self.checkBox_18.toggle()
 
-        if self.controller_setting["direction"]["LStick"]: self.checkBox_21.toggle()
-        if self.controller_setting["direction"]["RStick"]: self.checkBox_22.toggle()
+        if self.controller_setting["direction"]["LStick"]:
+            self.checkBox_21.toggle()
+        if self.controller_setting["direction"]["RStick"]:
+            self.checkBox_22.toggle()
 
     def remap_key(self):
-        self.keymap = {v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["button"].items() if
-                       v["state"]} | {
-                          v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["hat"].items() if
-                          v["state"]}
+        self.keymap = {
+            v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["button"].items() if v["state"]
+        } | {v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["hat"].items() if v["state"]}
         try:
             self.Controller_worker.set_keymap(self.keymap)
         except Exception as e:
@@ -287,76 +305,112 @@ class SettingWindow(QtWidgets.QWidget, Ui_Form):
         print(self.keymap)
 
     def btn_ZL(self):
-        self.setting.setting["key_config"]["joystick"]["button"]["ZL"] = {"state": self.checkBox.isChecked(),
-                                                                          "assign": self.lineEdit.text()}
+        self.setting.setting["key_config"]["joystick"]["button"]["ZL"] = {
+            "state": self.checkBox.isChecked(),
+            "assign": self.lineEdit.text(),
+        }
 
     def btn_L(self):
-        self.setting.setting["key_config"]["joystick"]["button"]["L"] = {"state": self.checkBox_2.isChecked(),
-                                                                         "assign": self.lineEdit_2.text()}
+        self.setting.setting["key_config"]["joystick"]["button"]["L"] = {
+            "state": self.checkBox_2.isChecked(),
+            "assign": self.lineEdit_2.text(),
+        }
 
     def btn_LCLICK(self):
-        self.setting.setting["key_config"]["joystick"]["button"]["LCLICK"] = {"state": self.checkBox_3.isChecked(),
-                                                                              "assign": self.lineEdit_3.text()}
+        self.setting.setting["key_config"]["joystick"]["button"]["LCLICK"] = {
+            "state": self.checkBox_3.isChecked(),
+            "assign": self.lineEdit_3.text(),
+        }
 
     def btn_MINUS(self):
-        self.setting.setting["key_config"]["joystick"]["button"]["MINUS"] = {"state": self.checkBox_4.isChecked(),
-                                                                             "assign": self.lineEdit_4.text()}
+        self.setting.setting["key_config"]["joystick"]["button"]["MINUS"] = {
+            "state": self.checkBox_4.isChecked(),
+            "assign": self.lineEdit_4.text(),
+        }
 
     def hat_TOP(self):
-        self.setting.setting["key_config"]["joystick"]["hat"]["TOP"] = {"state": self.checkBox_5.isChecked(),
-                                                                        "assign": self.lineEdit_5.text()}
+        self.setting.setting["key_config"]["joystick"]["hat"]["TOP"] = {
+            "state": self.checkBox_5.isChecked(),
+            "assign": self.lineEdit_5.text(),
+        }
 
     def hat_BTM(self):
-        self.setting.setting["key_config"]["joystick"]["hat"]["BTM"] = {"state": self.checkBox_6.isChecked(),
-                                                                        "assign": self.lineEdit_6.text()}
+        self.setting.setting["key_config"]["joystick"]["hat"]["BTM"] = {
+            "state": self.checkBox_6.isChecked(),
+            "assign": self.lineEdit_6.text(),
+        }
 
     def hat_LEFT(self):
-        self.setting.setting["key_config"]["joystick"]["hat"]["LEFT"] = {"state": self.checkBox_7.isChecked(),
-                                                                         "assign": self.lineEdit_7.text()}
+        self.setting.setting["key_config"]["joystick"]["hat"]["LEFT"] = {
+            "state": self.checkBox_7.isChecked(),
+            "assign": self.lineEdit_7.text(),
+        }
 
     def hat_RIGHT(self):
-        self.setting.setting["key_config"]["joystick"]["hat"]["RIGHT"] = {"state": self.checkBox_8.isChecked(),
-                                                                          "assign": self.lineEdit_8.text()}
+        self.setting.setting["key_config"]["joystick"]["hat"]["RIGHT"] = {
+            "state": self.checkBox_8.isChecked(),
+            "assign": self.lineEdit_8.text(),
+        }
 
     def btn_CAPTURE(self):
-        self.setting.setting["key_config"]["joystick"]["button"]["CAPTURE"] = {"state": self.checkBox_9.isChecked(),
-                                                                               "assign": self.lineEdit_9.text()}
+        self.setting.setting["key_config"]["joystick"]["button"]["CAPTURE"] = {
+            "state": self.checkBox_9.isChecked(),
+            "assign": self.lineEdit_9.text(),
+        }
 
     def btn_ZR(self):
-        self.setting.setting["key_config"]["joystick"]["button"]["ZR"] = {"state": self.checkBox_10.isChecked(),
-                                                                          "assign": self.lineEdit_10.text()}
+        self.setting.setting["key_config"]["joystick"]["button"]["ZR"] = {
+            "state": self.checkBox_10.isChecked(),
+            "assign": self.lineEdit_10.text(),
+        }
 
     def btn_R(self):
-        self.setting.setting["key_config"]["joystick"]["button"]["R"] = {"state": self.checkBox_11.isChecked(),
-                                                                         "assign": self.lineEdit_11.text()}
+        self.setting.setting["key_config"]["joystick"]["button"]["R"] = {
+            "state": self.checkBox_11.isChecked(),
+            "assign": self.lineEdit_11.text(),
+        }
 
     def btn_RCLICK(self):
-        self.setting.setting["key_config"]["joystick"]["button"]["RCLICK"] = {"state": self.checkBox_12.isChecked(),
-                                                                              "assign": self.lineEdit_12.text()}
+        self.setting.setting["key_config"]["joystick"]["button"]["RCLICK"] = {
+            "state": self.checkBox_12.isChecked(),
+            "assign": self.lineEdit_12.text(),
+        }
 
     def btn_PLUS(self):
-        self.setting.setting["key_config"]["joystick"]["button"]["PLUS"] = {"state": self.checkBox_13.isChecked(),
-                                                                            "assign": self.lineEdit_13.text()}
+        self.setting.setting["key_config"]["joystick"]["button"]["PLUS"] = {
+            "state": self.checkBox_13.isChecked(),
+            "assign": self.lineEdit_13.text(),
+        }
 
     def btn_A(self):
-        self.setting.setting["key_config"]["joystick"]["button"]["A"] = {"state": self.checkBox_14.isChecked(),
-                                                                         "assign": self.lineEdit_14.text()}
+        self.setting.setting["key_config"]["joystick"]["button"]["A"] = {
+            "state": self.checkBox_14.isChecked(),
+            "assign": self.lineEdit_14.text(),
+        }
 
     def btn_B(self):
-        self.setting.setting["key_config"]["joystick"]["button"]["B"] = {"state": self.checkBox_15.isChecked(),
-                                                                         "assign": self.lineEdit_15.text()}
+        self.setting.setting["key_config"]["joystick"]["button"]["B"] = {
+            "state": self.checkBox_15.isChecked(),
+            "assign": self.lineEdit_15.text(),
+        }
 
     def btn_X(self):
-        self.setting.setting["key_config"]["joystick"]["button"]["X"] = {"state": self.checkBox_16.isChecked(),
-                                                                         "assign": self.lineEdit_16.text()}
+        self.setting.setting["key_config"]["joystick"]["button"]["X"] = {
+            "state": self.checkBox_16.isChecked(),
+            "assign": self.lineEdit_16.text(),
+        }
 
     def btn_Y(self):
-        self.setting.setting["key_config"]["joystick"]["button"]["Y"] = {"state": self.checkBox_17.isChecked(),
-                                                                         "assign": self.lineEdit_17.text()}
+        self.setting.setting["key_config"]["joystick"]["button"]["Y"] = {
+            "state": self.checkBox_17.isChecked(),
+            "assign": self.lineEdit_17.text(),
+        }
 
     def btn_HOME(self):
-        self.setting.setting["key_config"]["joystick"]["button"]["HOME"] = {"state": self.checkBox_18.isChecked(),
-                                                                            "assign": self.lineEdit_18.text()}
+        self.setting.setting["key_config"]["joystick"]["button"]["HOME"] = {
+            "state": self.checkBox_18.isChecked(),
+            "assign": self.lineEdit_18.text(),
+        }
 
     def dir_L(self):
         self.setting.setting["key_config"]["joystick"]["direction"]["LStick"] = self.checkBox_21.isChecked()
@@ -525,20 +579,38 @@ class GamepadController(QObject):
         self.use_Lstick = None
         self.is_alive = True
         self.keymap = {}
+        self.pause = False
         pygame.init()
-        pygame.joystick.init()
-        self.joystick_ = pygame.joystick.Joystick(0)
-        self.joystick_.init()
+        if not self.connect_joystick():
+            self.no_joystick = True
 
         self._stick = np.zeros((4, 1))
         self._btn_down = np.array([0])
         self._btn_up = np.array([0])
 
-        self.shm = shared_memory.SharedMemory(create=True, size=self._stick.nbytes, name='stick')  # 共有メモリを作成
+        self.shm = shared_memory.SharedMemory(create=True, size=self._stick.nbytes, name="stick")  # 共有メモリを作成
 
         self.stick = np.ndarray(self._stick.shape, dtype=self._stick.dtype, buffer=self.shm.buf)
 
+        if not self.no_joystick:
+            self.p = Process(target=j_stick)
+
+    def connect_joystick(self):
+        try:
+            pygame.joystick.init()
+            self.joystick_ = pygame.joystick.Joystick(0)
+            self.joystick_.init()
+            print("init joystick")
+            self.no_joystick = False
+            return True
+        except:
+            print("No joystick")
+            return False
+
+    def reconnect_subprocess(self):
+        self.p.kill()
         self.p = Process(target=j_stick)
+        self.p.start()
 
     def set_keymap(self, keymap):
         self.keymap = keymap
@@ -552,9 +624,16 @@ class GamepadController(QObject):
     def run(self):
         # print(self.joystick.get_name())
         # self.joystick_.init()
-        self.p.start()
-        while self.is_alive:
-            # print("running")
+        try:
+            self.p.start()
+        except:
+            pass
+        # while self.is_alive:
+        while True:
+            if self.pause is True or self.no_joystick is True:
+                time.sleep(1.0)
+                continue
+            # print(f"running {threading.get_ident()}")
             start = time.perf_counter()
 
             if self.use_Lstick and self.use_Rstick:
@@ -782,17 +861,21 @@ class GamepadController(QObject):
         print("DEAD")
         self.p.kill()
 
+    def check(self):
+        print(self.is_alive)
+
     def stop(self):
         self.is_alive = False
         self.p.kill()
 
 
 def j_stick():
+    print(os.getpid())
     pygame.init()
     pygame.joystick.init()
     joystick = pygame.joystick.Joystick(0)
 
-    stick_shm = shared_memory.SharedMemory(name='stick')  # 共有メモリを取得
+    stick_shm = shared_memory.SharedMemory(name="stick")  # 共有メモリを取得
     stick = np.ndarray((4, 1), dtype=np.float64, buffer=stick_shm.buf)
 
     while True:
@@ -804,7 +887,7 @@ def j_stick():
                 stick[3] = joystick.get_axis(3)  # right vertical
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # 環境変数にPySide6を登録
     dir_name = os.path.dirname(PySide6.__file__)
     pluginPath = os.path.join(dir_name, "plugins", "platforms")
