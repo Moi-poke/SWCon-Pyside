@@ -5,6 +5,7 @@ import threading
 import time
 from abc import abstractmethod
 
+from datetime import datetime
 import cv2
 import numpy
 from PySide6.QtCore import QObject, Signal, Slot
@@ -126,8 +127,11 @@ class CommandBase(QObject):
 
     def screenshot(self):
         try:
-            # self.imwrite("./.png", self.src)
-            # print("capture succeeded:")
+            self.get_image.emit(True)
+            self.imwrite(
+                os.path.join(self.CAPTURE_DIR, f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.png"), self.src
+            )
+            print("capture succeeded:")
             pass
         except cv2.error as e:
             # print("Capture Failed")
@@ -162,6 +166,7 @@ class CommandBase(QObject):
     @staticmethod
     def imwrite(filename, img, params=None):
         try:
+            # print(img)
             ext = os.path.splitext(filename)[1]
             result, n = cv2.imencode(ext, img, params)
 

@@ -8,7 +8,7 @@ tab = "python"
 token_1 = "ここにLINE通知用のtokenを貼付"
 
 [command]
-py_command = "ABXY連打"
+py_command = "A連打"
 mcu_command = ""
 
 [main_window.must]

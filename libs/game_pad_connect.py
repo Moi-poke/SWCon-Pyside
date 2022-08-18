@@ -580,9 +580,9 @@ class GamepadController(QObject):
         self.is_alive = True
         self.keymap = {}
         self.pause = False
+        self.p = None
         pygame.init()
-        if not self.connect_joystick():
-            self.no_joystick = True
+        self.connect_joystick()
 
         self._stick = np.zeros((4, 1))
         self._btn_down = np.array([0])
@@ -592,9 +592,6 @@ class GamepadController(QObject):
 
         self.stick = np.ndarray(self._stick.shape, dtype=self._stick.dtype, buffer=self.shm.buf)
 
-        if not self.no_joystick:
-            self.p = Process(target=j_stick)
-
     def connect_joystick(self):
         try:
             pygame.joystick.init()
@@ -602,13 +599,18 @@ class GamepadController(QObject):
             self.joystick_.init()
             print("init joystick")
             self.no_joystick = False
+            self.reconnect_subprocess()
             return True
-        except:
+        except:            
+            self.no_joystick = True
             print("No joystick")
             return False
 
     def reconnect_subprocess(self):
-        self.p.kill()
+        if self.p is not None:
+            self.p.kill()
+            self.p.join()
+            self.p = None
         self.p = Process(target=j_stick)
         self.p.start()
 
