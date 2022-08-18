@@ -27,7 +27,7 @@ from libs.Utility import ospath
 from ui.main_ui import Ui_MainWindow
 from ui.QtextLogger import QPlainTextEditLogger
 
-VERSION = "0.2.0 (beta)"
+VERSION = "0.2.1 (beta)"
 Author = "Moi"
 
 # Todo
