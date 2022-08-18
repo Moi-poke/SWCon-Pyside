@@ -192,7 +192,7 @@
              <string>Python</string>
             </attribute>
             <layout class="QGridLayout" name="gridLayout_5">
-             <item row="0" column="6">
+             <item row="0" column="5">
               <widget class="QToolButton" name="toolButtonOpenPythonDir">
                <property name="text">
                 <string>...</string>
@@ -212,7 +212,7 @@
                </property>
               </spacer>
              </item>
-             <item row="1" column="2">
+             <item row="1" column="1">
               <widget class="QPushButton" name="pushButton_PythonReload">
                <property name="enabled">
                 <bool>true</bool>
@@ -237,10 +237,10 @@
                </property>
               </widget>
              </item>
-             <item row="0" column="0" colspan="6">
+             <item row="0" column="0" colspan="5">
               <widget class="QComboBox" name="comboBoxPython"/>
              </item>
-             <item row="1" column="5" colspan="2">
+             <item row="1" column="4" colspan="2">
               <widget class="QPushButton" name="pushButton_PythonStop">
                <property name="sizePolicy">
                 <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
@@ -259,7 +259,7 @@
                </property>
               </widget>
              </item>
-             <item row="1" column="3" colspan="2">
+             <item row="1" column="2" colspan="2">
               <widget class="QPushButton" name="pushButton_PythonStart">
                <property name="enabled">
                 <bool>true</bool>
@@ -281,31 +281,6 @@
                </property>
                <property name="default">
                 <bool>true</bool>
-               </property>
-              </widget>
-             </item>
-             <item row="1" column="1">
-              <widget class="QPushButton" name="pushButton_debug">
-               <property name="enabled">
-                <bool>true</bool>
-               </property>
-               <property name="sizePolicy">
-                <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-                 <horstretch>0</horstretch>
-                 <verstretch>0</verstretch>
-                </sizepolicy>
-               </property>
-               <property name="minimumSize">
-                <size>
-                 <width>80</width>
-                 <height>0</height>
-                </size>
-               </property>
-               <property name="text">
-                <string>debug</string>
-               </property>
-               <property name="default">
-                <bool>false</bool>
                </property>
               </widget>
              </item>
@@ -648,8 +623,15 @@
      <addaction name="actionGuiControllerOpen"/>
      <addaction name="actionGuiSetting"/>
     </widget>
+    <widget class="QMenu" name="menuGamepad_Controller">
+     <property name="title">
+      <string>Gamepad Controller</string>
+     </property>
+     <addaction name="actionconnect"/>
+     <addaction name="actionsetting"/>
+    </widget>
     <addaction name="menuGUI_Controller_2"/>
-    <addaction name="actionGamepad_Controller"/>
+    <addaction name="menuGamepad_Controller"/>
    </widget>
    <widget class="QMenu" name="menuWindow">
     <property name="title">
@@ -2058,7 +2040,7 @@
   </action>
   <action name="actionGuiControllerOpen">
    <property name="text">
-    <string>Open</string>
+    <string>表示</string>
    </property>
    <property name="font">
     <font>
@@ -2068,7 +2050,7 @@
   </action>
   <action name="actionGuiSetting">
    <property name="text">
-    <string>Setting</string>
+    <string>設定</string>
    </property>
    <property name="font">
     <font>
@@ -2114,9 +2096,14 @@
     <string>Log Window</string>
    </property>
   </action>
-  <action name="actionGamepad_Controller">
+  <action name="actionconnect">
    <property name="text">
-    <string>Gamepad Controller</string>
+    <string>接続</string>
+   </property>
+  </action>
+  <action name="actionsetting">
+   <property name="text">
+    <string>設定</string>
    </property>
   </action>
  </widget>

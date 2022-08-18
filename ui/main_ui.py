@@ -80,8 +80,10 @@ class Ui_MainWindow(object):
         self.actionShow_Camera_Realtime.setCheckable(True)
         self.actionLog_Window = QAction(MainWindow)
         self.actionLog_Window.setObjectName(u"actionLog_Window")
-        self.actionGamepad_Controller = QAction(MainWindow)
-        self.actionGamepad_Controller.setObjectName(u"actionGamepad_Controller")
+        self.actionconnect = QAction(MainWindow)
+        self.actionconnect.setObjectName(u"actionconnect")
+        self.actionsetting = QAction(MainWindow)
+        self.actionsetting.setObjectName(u"actionsetting")
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
         self.centralwidget.setAutoFillBackground(False)
@@ -143,7 +145,7 @@ class Ui_MainWindow(object):
         self.toolButtonOpenPythonDir = QToolButton(self.tab)
         self.toolButtonOpenPythonDir.setObjectName(u"toolButtonOpenPythonDir")
 
-        self.gridLayout_5.addWidget(self.toolButtonOpenPythonDir, 0, 6, 1, 1)
+        self.gridLayout_5.addWidget(self.toolButtonOpenPythonDir, 0, 5, 1, 1)
 
         self.horizontalSpacer = QSpacerItem(419, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
 
@@ -159,12 +161,12 @@ class Ui_MainWindow(object):
         self.pushButton_PythonReload.setSizePolicy(sizePolicy2)
         self.pushButton_PythonReload.setMinimumSize(QSize(80, 0))
 
-        self.gridLayout_5.addWidget(self.pushButton_PythonReload, 1, 2, 1, 1)
+        self.gridLayout_5.addWidget(self.pushButton_PythonReload, 1, 1, 1, 1)
 
         self.comboBoxPython = QComboBox(self.tab)
         self.comboBoxPython.setObjectName(u"comboBoxPython")
 
-        self.gridLayout_5.addWidget(self.comboBoxPython, 0, 0, 1, 6)
+        self.gridLayout_5.addWidget(self.comboBoxPython, 0, 0, 1, 5)
 
         self.pushButton_PythonStop = QPushButton(self.tab)
         self.pushButton_PythonStop.setObjectName(u"pushButton_PythonStop")
@@ -172,7 +174,7 @@ class Ui_MainWindow(object):
         self.pushButton_PythonStop.setSizePolicy(sizePolicy2)
         self.pushButton_PythonStop.setMinimumSize(QSize(80, 0))
 
-        self.gridLayout_5.addWidget(self.pushButton_PythonStop, 1, 5, 1, 2)
+        self.gridLayout_5.addWidget(self.pushButton_PythonStop, 1, 4, 1, 2)
 
         self.pushButton_PythonStart = QPushButton(self.tab)
         self.pushButton_PythonStart.setObjectName(u"pushButton_PythonStart")
@@ -181,16 +183,7 @@ class Ui_MainWindow(object):
         self.pushButton_PythonStart.setSizePolicy(sizePolicy2)
         self.pushButton_PythonStart.setMinimumSize(QSize(80, 0))
 
-        self.gridLayout_5.addWidget(self.pushButton_PythonStart, 1, 3, 1, 2)
-
-        self.pushButton_debug = QPushButton(self.tab)
-        self.pushButton_debug.setObjectName(u"pushButton_debug")
-        self.pushButton_debug.setEnabled(True)
-        sizePolicy2.setHeightForWidth(self.pushButton_debug.sizePolicy().hasHeightForWidth())
-        self.pushButton_debug.setSizePolicy(sizePolicy2)
-        self.pushButton_debug.setMinimumSize(QSize(80, 0))
-
-        self.gridLayout_5.addWidget(self.pushButton_debug, 1, 1, 1, 1)
+        self.gridLayout_5.addWidget(self.pushButton_PythonStart, 1, 2, 1, 2)
 
         self.tabWidget.addTab(self.tab, "")
         self.tab_2 = QWidget()
@@ -351,6 +344,8 @@ class Ui_MainWindow(object):
         self.menuGUI_Controller.setObjectName(u"menuGUI_Controller")
         self.menuGUI_Controller_2 = QMenu(self.menuGUI_Controller)
         self.menuGUI_Controller_2.setObjectName(u"menuGUI_Controller_2")
+        self.menuGamepad_Controller = QMenu(self.menuGUI_Controller)
+        self.menuGamepad_Controller.setObjectName(u"menuGamepad_Controller")
         self.menuWindow = QMenu(self.menubar)
         self.menuWindow.setObjectName(u"menuWindow")
         MainWindow.setMenuBar(self.menubar)
@@ -878,9 +873,11 @@ class Ui_MainWindow(object):
         self.menuOption.addAction(self.actionR_Stick_Control)
         self.menuOption.addSeparator()
         self.menuGUI_Controller.addAction(self.menuGUI_Controller_2.menuAction())
-        self.menuGUI_Controller.addAction(self.actionGamepad_Controller)
+        self.menuGUI_Controller.addAction(self.menuGamepad_Controller.menuAction())
         self.menuGUI_Controller_2.addAction(self.actionGuiControllerOpen)
         self.menuGUI_Controller_2.addAction(self.actionGuiSetting)
+        self.menuGamepad_Controller.addAction(self.actionconnect)
+        self.menuGamepad_Controller.addAction(self.actionsetting)
         self.menuWindow.addAction(self.actionLog_Window)
 
         self.retranslateUi(MainWindow)
@@ -892,7 +889,6 @@ class Ui_MainWindow(object):
         self.tabWidget.setCurrentIndex(0)
         self.pushButton_PythonReload.setDefault(False)
         self.pushButton_PythonStart.setDefault(True)
-        self.pushButton_debug.setDefault(False)
         self.pushButton_MCUStart.setDefault(True)
         self.pushButtonScreenShot.setDefault(False)
         self.comboBoxCameraNames.setCurrentIndex(-1)
@@ -906,8 +902,8 @@ class Ui_MainWindow(object):
         self.actionL_Stick_Control.setText(QCoreApplication.translate("MainWindow", u"L Stick Control", None))
         self.actionR_Stick_Control.setText(QCoreApplication.translate("MainWindow", u"R Stick Control", None))
         self.actionKeyboard_Control.setText(QCoreApplication.translate("MainWindow", u"Keyboard Control", None))
-        self.actionGuiControllerOpen.setText(QCoreApplication.translate("MainWindow", u"Open", None))
-        self.actionGuiSetting.setText(QCoreApplication.translate("MainWindow", u"Setting", None))
+        self.actionGuiControllerOpen.setText(QCoreApplication.translate("MainWindow", u"\u8868\u793a", None))
+        self.actionGuiSetting.setText(QCoreApplication.translate("MainWindow", u"\u8a2d\u5b9a", None))
         self.actionSetting.setText(QCoreApplication.translate("MainWindow", u"Setting", None))
         self.actionQuit.setText(QCoreApplication.translate("MainWindow", u"Quit", None))
 #if QT_CONFIG(shortcut)
@@ -916,13 +912,13 @@ class Ui_MainWindow(object):
         self.actionShow_Serial.setText(QCoreApplication.translate("MainWindow", u"Show Serial", None))
         self.actionShow_Camera_Realtime.setText(QCoreApplication.translate("MainWindow", u"Show Camera Realtime", None))
         self.actionLog_Window.setText(QCoreApplication.translate("MainWindow", u"Log Window", None))
-        self.actionGamepad_Controller.setText(QCoreApplication.translate("MainWindow", u"Gamepad Controller", None))
+        self.actionconnect.setText(QCoreApplication.translate("MainWindow", u"\u63a5\u7d9a", None))
+        self.actionsetting.setText(QCoreApplication.translate("MainWindow", u"\u8a2d\u5b9a", None))
         self.CaptureImageArea.setText(QCoreApplication.translate("MainWindow", u"CaptureImage", None))
         self.toolButtonOpenPythonDir.setText(QCoreApplication.translate("MainWindow", u"...", None))
         self.pushButton_PythonReload.setText(QCoreApplication.translate("MainWindow", u"Reload", None))
         self.pushButton_PythonStop.setText(QCoreApplication.translate("MainWindow", u"Stop", None))
         self.pushButton_PythonStart.setText(QCoreApplication.translate("MainWindow", u"Start", None))
-        self.pushButton_debug.setText(QCoreApplication.translate("MainWindow", u"debug", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab), QCoreApplication.translate("MainWindow", u"Python", None))
         self.pushButton_MCUStart.setText(QCoreApplication.translate("MainWindow", u"Start", None))
         self.toolButton_OpenMCUDir.setText(QCoreApplication.translate("MainWindow", u"...", None))
@@ -947,6 +943,7 @@ class Ui_MainWindow(object):
         self.menuOption.setTitle(QCoreApplication.translate("MainWindow", u"Option", None))
         self.menuGUI_Controller.setTitle(QCoreApplication.translate("MainWindow", u"Controller", None))
         self.menuGUI_Controller_2.setTitle(QCoreApplication.translate("MainWindow", u"GUI Controller", None))
+        self.menuGamepad_Controller.setTitle(QCoreApplication.translate("MainWindow", u"Gamepad Controller", None))
         self.menuWindow.setTitle(QCoreApplication.translate("MainWindow", u"Window", None))
         self.dockWidget_log.setWindowTitle(QCoreApplication.translate("MainWindow", u"Log", None))
         self.dockWidget_left.setWindowTitle(QCoreApplication.translate("MainWindow", u"Controller(LEFT)", None))

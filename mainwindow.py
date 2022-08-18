@@ -119,7 +119,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.setting.setting["main_window"]["option"]["window_size_width"],
                 self.setting.setting["main_window"]["option"]["window_size_height"],
             )
-        self.pushButton_debug.pressed.connect(self.test)
 
     def test(self):
         self.reconnect_gamepad()
@@ -361,6 +360,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.lineEditComPort.textChanged.connect(self.assign_com_port_to_setting)
         self.comboBox_MCU.currentIndexChanged.connect(self.assign_mcu_command_to_setting)
         self.comboBoxPython.currentIndexChanged.connect(self.assign_py_command_to_setting)
+
+        self.actionconnect.triggered.connect(self.reconnect_gamepad)
 
     def assign_fps_to_setting(self):
         self.setting.setting["main_window"]["must"]["fps"] = self.lineEditFPS.text()
