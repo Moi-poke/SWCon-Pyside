@@ -814,7 +814,7 @@
             </spacer>
            </item>
            <item alignment="Qt::AlignHCenter|Qt::AlignVCenter">
-            <widget class="QPushButton" name="BTN_ZL">
+            <widget class="QPushButton" name="BTN_zl">
              <property name="minimumSize">
               <size>
                <width>120</width>
@@ -857,7 +857,7 @@
             </widget>
            </item>
            <item alignment="Qt::AlignHCenter">
-            <widget class="QPushButton" name="BTN_L">
+            <widget class="QPushButton" name="BTN_l">
              <property name="minimumSize">
               <size>
                <width>120</width>
@@ -1439,7 +1439,7 @@
             </spacer>
            </item>
            <item alignment="Qt::AlignHCenter|Qt::AlignVCenter">
-            <widget class="QPushButton" name="BTN_ZR">
+            <widget class="QPushButton" name="BTN_zr">
              <property name="minimumSize">
               <size>
                <width>120</width>
@@ -1482,7 +1482,7 @@
             </widget>
            </item>
            <item alignment="Qt::AlignHCenter">
-            <widget class="QPushButton" name="BTN_R">
+            <widget class="QPushButton" name="BTN_r">
              <property name="minimumSize">
               <size>
                <width>120</width>
@@ -1565,7 +1565,7 @@
                </spacer>
               </item>
               <item row="1" column="0">
-               <widget class="QPushButton" name="BTN__plus">
+               <widget class="QPushButton" name="BTN_plus">
                 <property name="minimumSize">
                  <size>
                   <width>30</width>
@@ -1609,7 +1609,7 @@
                </widget>
               </item>
               <item row="1" column="3">
-               <widget class="QPushButton" name="BTN__rs">
+               <widget class="QPushButton" name="BTN_rs">
                 <property name="minimumSize">
                  <size>
                   <width>30</width>
@@ -1679,7 +1679,7 @@
                <number>0</number>
               </property>
               <item row="0" column="1">
-               <widget class="QPushButton" name="BTN__x">
+               <widget class="QPushButton" name="BTN_x">
                 <property name="minimumSize">
                  <size>
                   <width>30</width>
@@ -1707,7 +1707,7 @@
                </widget>
               </item>
               <item row="1" column="2">
-               <widget class="QPushButton" name="BTN__a">
+               <widget class="QPushButton" name="BTN_a">
                 <property name="minimumSize">
                  <size>
                   <width>30</width>
@@ -1735,7 +1735,7 @@
                </widget>
               </item>
               <item row="1" column="0">
-               <widget class="QPushButton" name="BTN__y">
+               <widget class="QPushButton" name="BTN_y">
                 <property name="minimumSize">
                  <size>
                   <width>30</width>
@@ -1763,7 +1763,7 @@
                </widget>
               </item>
               <item row="2" column="1">
-               <widget class="QPushButton" name="BTN__b">
+               <widget class="QPushButton" name="BTN_b">
                 <property name="minimumSize">
                  <size>
                   <width>30</width>
@@ -1924,7 +1924,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QPushButton" name="BTN__home">
+               <widget class="QPushButton" name="BTN_home">
                 <property name="minimumSize">
                  <size>
                   <width>32</width>
@@ -2196,8 +2196,8 @@
      <y>-1</y>
     </hint>
     <hint type="destinationlabel">
-     <x>874</x>
-     <y>289</y>
+     <x>1034</x>
+     <y>311</y>
     </hint>
    </hints>
   </connection>

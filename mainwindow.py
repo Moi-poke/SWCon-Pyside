@@ -27,7 +27,7 @@ from libs.Utility import ospath
 from ui.main_ui import Ui_MainWindow
 from ui.QtextLogger import QPlainTextEditLogger
 
-VERSION = "0.2.1 (beta)"
+VERSION = "0.2.2 (beta)"
 Author = "Moi"
 
 # Todo
@@ -60,6 +60,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.is_show_serial = False
         self.keyPress = None
         self.keymap = None
+
         self.setting = Setting()
 
         self.setupUi(self)
@@ -119,9 +120,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.setting.setting["main_window"]["option"]["window_size_width"],
                 self.setting.setting["main_window"]["option"]["window_size_height"],
             )
+        self.pushButtonScreenShot.clicked.connect(self.test)
 
     def test(self):
-        self.reconnect_gamepad()
+        self.BTN_a.toggle()
 
     # <editor-fold desc="ゲームパッド関連">
     def connect_gamepad(self):
@@ -189,112 +191,531 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.GamepadController_worker.connect_joystick()
         pass
 
+    def BTN_click(self, event):
+        btn = self.sender().objectName()[4:]
+        match btn:
+            case "zl":
+                if self.sender().isChecked():
+                    self.press_zl()
+                else:
+                    self.release_zl()
+            case "l":
+                if self.sender().isChecked():
+                    self.press_l()
+                else:
+                    self.release_l()
+            case "up":
+                if self.sender().isChecked():
+                    self.press_top()
+                else:
+                    self.release_top()
+            case "down":
+                if self.sender().isChecked():
+                    self.press_btm()
+                else:
+                    self.release_btm()
+            case "left":
+                if self.sender().isChecked():
+                    self.press_left()
+                else:
+                    self.release_left()
+            case "right":
+                if self.sender().isChecked():
+                    self.press_right()
+                else:
+                    self.release_right()
+            case "capture":
+                if self.sender().isChecked():
+                    self.press_capture()
+                else:
+                    self.release_capture()
+            case "ls":
+                if self.sender().isChecked():
+                    self.press_lclick()
+                else:
+                    self.release_lclick()
+            case "minus":
+                if self.sender().isChecked():
+                    self.press_minus()
+                else:
+                    self.release_minus()
+            case "zr":
+                if self.sender().isChecked():
+                    self.press_zr()
+                else:
+                    self.release_zr()
+            case "r":
+                if self.sender().isChecked():
+                    self.press_r()
+                else:
+                    self.release_r()
+            case "plus":
+                if self.sender().isChecked():
+                    self.press_plus()
+                else:
+                    self.release_plus()
+            case "rs":
+                if self.sender().isChecked():
+                    self.press_rclick()
+                else:
+                    self.release_rclick()
+            case "a":
+                if self.sender().isChecked():
+                    self.press_a()
+                else:
+                    self.release_a()
+            case "b":
+                if self.sender().isChecked():
+                    self.press_b()
+                else:
+                    self.release_b()
+            case "x":
+                if self.sender().isChecked():
+                    self.press_x()
+                else:
+                    self.release_x()
+            case "y":
+                if self.sender().isChecked():
+                    self.press_y()
+                else:
+                    self.release_y()
+            case "home":
+                if self.sender().isChecked():
+                    self.press_home()
+                else:
+                    self.release_home()
+
     def press_zl(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_zl.setChecked(True)
+
         self.keyPress.input(Button.ZL)
 
     def press_l(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_l.setChecked(True)
         self.keyPress.input(Button.L)
 
     def press_lclick(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_ls.setChecked(True)
         self.keyPress.input(Button.LCLICK)
 
     def press_minus(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_minus.setChecked(True)
         self.keyPress.input(Button.MINUS)
 
     def press_top(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_up.setChecked(True)
         self.keyPress.input(Hat.TOP)
 
     def press_btm(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_down.setChecked(True)
         self.keyPress.input(Hat.BTM)
 
     def press_left(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_left.setChecked(True)
         self.keyPress.input(Hat.LEFT)
 
     def press_right(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_right.setChecked(True)
         self.keyPress.input(Hat.RIGHT)
 
     def press_capture(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_capture.setChecked(True)
         self.keyPress.input(Button.CAPTURE)
 
     def press_zr(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_zr.setChecked(True)
         self.keyPress.input(Button.ZR)
 
     def press_r(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_r.setChecked(True)
         self.keyPress.input(Button.R)
 
     def press_rclick(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_rs.setChecked(True)
         self.keyPress.input(Button.RCLICK)
 
     def press_plus(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_plus.setChecked(True)
         self.keyPress.input(Button.PLUS)
 
     def press_a(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_a.setChecked(True)
         self.keyPress.input(Button.A)
 
     def press_b(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_b.setChecked(True)
         self.keyPress.input(Button.B)
 
     def press_x(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_x.setChecked(True)
         self.keyPress.input(Button.X)
 
     def press_y(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_y.setChecked(True)
         self.keyPress.input(Button.Y)
 
     def press_home(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_home.setChecked(True)
         self.keyPress.input(Button.HOME)
 
     def release_zl(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_zl.setChecked(False)
         self.keyPress.inputEnd(Button.ZL)
 
     def release_l(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_l.setChecked(False)
         self.keyPress.inputEnd(Button.L)
 
     def release_lclick(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_ls.setChecked(False)
         self.keyPress.inputEnd(Button.LCLICK)
 
     def release_minus(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_minus.setChecked(False)
         self.keyPress.inputEnd(Button.MINUS)
 
     def release_top(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_up.setChecked(False)
         self.keyPress.inputEnd(Hat.TOP)
 
     def release_btm(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_down.setChecked(False)
         self.keyPress.inputEnd(Hat.BTM)
 
     def release_left(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_left.setChecked(False)
         self.keyPress.inputEnd(Hat.LEFT)
 
     def release_right(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_right.setChecked(False)
         self.keyPress.inputEnd(Hat.RIGHT)
 
     def release_capture(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_capture.setChecked(False)
         self.keyPress.inputEnd(Button.CAPTURE)
 
     def release_zr(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_zr.setChecked(False)
         self.keyPress.inputEnd(Button.ZR)
 
     def release_r(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_r.setChecked(False)
         self.keyPress.inputEnd(Button.R)
 
     def release_rclick(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_rs.setChecked(False)
         self.keyPress.inputEnd(Button.RCLICK)
 
     def release_plus(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_plus.setChecked(False)
         self.keyPress.inputEnd(Button.PLUS)
 
     def release_a(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_a.setChecked(False)
         self.keyPress.inputEnd(Button.A)
 
     def release_b(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_b.setChecked(False)
         self.keyPress.inputEnd(Button.B)
 
     def release_x(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_x.setChecked(False)
         self.keyPress.inputEnd(Button.X)
 
     def release_y(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_y.setChecked(False)
         self.keyPress.inputEnd(Button.Y)
 
     def release_home(self):
+        try:
+            if type(self.sender()) == type(self.GamepadController_worker):
+                joystick = True
+            else:
+                joystick = False
+        except Exception:
+            joystick = False
+        if joystick:
+            self.BTN_home.setChecked(False)
         self.keyPress.inputEnd(Button.HOME)
 
     def stick_control(self, left_horizontal, left_vertical, right_horizontal, right_vertical):
@@ -338,6 +759,26 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.thread_1.finished.connect(self.thread_1.deleteLater)
 
     def setup_functions_connect(self):
+        # controllerボタンの割当
+        self.BTN_zl.clicked.connect(self.BTN_click)
+        self.BTN_l.clicked.connect(self.BTN_click)
+        self.BTN_up.clicked.connect(self.BTN_click)
+        self.BTN_down.clicked.connect(self.BTN_click)
+        self.BTN_left.clicked.connect(self.BTN_click)
+        self.BTN_right.clicked.connect(self.BTN_click)
+        self.BTN_capture.clicked.connect(self.BTN_click)
+        self.BTN_ls.clicked.connect(self.BTN_click)
+        self.BTN_minus.clicked.connect(self.BTN_click)
+        self.BTN_zr.clicked.connect(self.BTN_click)
+        self.BTN_r.clicked.connect(self.BTN_click)
+        self.BTN_plus.clicked.connect(self.BTN_click)
+        self.BTN_rs.clicked.connect(self.BTN_click)
+        self.BTN_a.clicked.connect(self.BTN_click)
+        self.BTN_b.clicked.connect(self.BTN_click)
+        self.BTN_x.clicked.connect(self.BTN_click)
+        self.BTN_y.clicked.connect(self.BTN_click)
+        self.BTN_home.clicked.connect(self.BTN_click)
+
         # 各ボタンの関数割当
         self.pushButton_PythonStart.pressed.connect(self.start_command)
         self.pushButton_PythonStop.pressed.connect(self.stop_command)
