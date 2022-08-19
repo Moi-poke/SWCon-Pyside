@@ -27,7 +27,7 @@ from libs.Utility import ospath
 from ui.main_ui import Ui_MainWindow
 from ui.QtextLogger import QPlainTextEditLogger
 
-VERSION = "0.2.2 (beta)"
+VERSION = "0.2.2.1 (beta)"
 Author = "Moi"
 
 # Todo
@@ -120,7 +120,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.setting.setting["main_window"]["option"]["window_size_width"],
                 self.setting.setting["main_window"]["option"]["window_size_height"],
             )
-        self.pushButtonScreenShot.clicked.connect(self.test)
+        # self.pushButtonScreenShot.clicked.connect(self.test)
 
     def test(self):
         self.BTN_a.toggle()
