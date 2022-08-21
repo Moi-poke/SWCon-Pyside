@@ -54,3 +54,6 @@ This repository is mainly licensed under the [GNU LGPL v3](http://github.com/IQA
 
 ### 免責事項
 このプログラム、および同梱のファイルの使用、または使用不具合等により生じたいかなる損害に関しまして、作者は一切責任を負いません。
+
+#### お布施
+https://ofuse.me/moi0326
