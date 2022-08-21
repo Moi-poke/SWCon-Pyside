@@ -87,6 +87,9 @@
           <height>0</height>
          </size>
         </property>
+        <property name="cursor">
+         <cursorShape>CrossCursor</cursorShape>
+        </property>
         <property name="layoutDirection">
          <enum>Qt::LeftToRight</enum>
         </property>
@@ -1040,13 +1043,13 @@
              <property name="minimumSize">
               <size>
                <width>120</width>
-               <height>90</height>
+               <height>120</height>
               </size>
              </property>
              <property name="maximumSize">
               <size>
                <width>120</width>
-               <height>90</height>
+               <height>120</height>
               </size>
              </property>
              <property name="frameShadow">
@@ -1069,7 +1072,7 @@
                <number>0</number>
               </property>
               <item row="0" column="0">
-               <widget class="QFrame" name="frame_18">
+               <widget class="Joystick" name="left_stick" native="true">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                   <horstretch>0</horstretch>
@@ -1078,57 +1081,32 @@
                 </property>
                 <property name="minimumSize">
                  <size>
-                  <width>90</width>
-                  <height>90</height>
+                  <width>120</width>
+                  <height>120</height>
                  </size>
                 </property>
                 <property name="maximumSize">
                  <size>
-                  <width>90</width>
-                  <height>90</height>
+                  <width>120</width>
+                  <height>120</height>
                  </size>
                 </property>
                 <layout class="QVBoxLayout" name="verticalLayout_6">
-                 <item alignment="Qt::AlignHCenter|Qt::AlignVCenter">
-                  <widget class="QLabel" name="label_5">
-                   <property name="sizePolicy">
-                    <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                     <horstretch>0</horstretch>
-                     <verstretch>0</verstretch>
-                    </sizepolicy>
-                   </property>
-                   <property name="minimumSize">
-                    <size>
-                     <width>30</width>
-                     <height>30</height>
-                    </size>
-                   </property>
-                   <property name="maximumSize">
-                    <size>
-                     <width>30</width>
-                     <height>30</height>
-                    </size>
-                   </property>
-                   <property name="frameShadow">
-                    <enum>QFrame::Plain</enum>
-                   </property>
-                   <property name="text">
-                    <string/>
-                   </property>
-                   <property name="textFormat">
-                    <enum>Qt::PlainText</enum>
-                   </property>
-                   <property name="scaledContents">
-                    <bool>true</bool>
-                   </property>
-                   <property name="alignment">
-                    <set>Qt::AlignCenter</set>
-                   </property>
-                   <property name="textInteractionFlags">
-                    <set>Qt::NoTextInteraction</set>
-                   </property>
-                  </widget>
-                 </item>
+                 <property name="spacing">
+                  <number>0</number>
+                 </property>
+                 <property name="leftMargin">
+                  <number>0</number>
+                 </property>
+                 <property name="topMargin">
+                  <number>0</number>
+                 </property>
+                 <property name="rightMargin">
+                  <number>0</number>
+                 </property>
+                 <property name="bottomMargin">
+                  <number>0</number>
+                 </property>
                 </layout>
                </widget>
               </item>
@@ -1807,13 +1785,13 @@
              <property name="minimumSize">
               <size>
                <width>120</width>
-               <height>90</height>
+               <height>120</height>
               </size>
              </property>
              <property name="maximumSize">
               <size>
                <width>120</width>
-               <height>90</height>
+               <height>120</height>
               </size>
              </property>
              <property name="frameShadow">
@@ -1836,7 +1814,7 @@
                <number>0</number>
               </property>
               <item row="0" column="0">
-               <widget class="QFrame" name="frame_25">
+               <widget class="Joystick" name="right_stick" native="true">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                   <horstretch>0</horstretch>
@@ -1845,57 +1823,32 @@
                 </property>
                 <property name="minimumSize">
                  <size>
-                  <width>90</width>
-                  <height>90</height>
+                  <width>120</width>
+                  <height>120</height>
                  </size>
                 </property>
                 <property name="maximumSize">
                  <size>
-                  <width>90</width>
-                  <height>90</height>
+                  <width>120</width>
+                  <height>120</height>
                  </size>
                 </property>
                 <layout class="QVBoxLayout" name="verticalLayout_8">
-                 <item alignment="Qt::AlignHCenter|Qt::AlignVCenter">
-                  <widget class="QLabel" name="label_6">
-                   <property name="sizePolicy">
-                    <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                     <horstretch>0</horstretch>
-                     <verstretch>0</verstretch>
-                    </sizepolicy>
-                   </property>
-                   <property name="minimumSize">
-                    <size>
-                     <width>30</width>
-                     <height>30</height>
-                    </size>
-                   </property>
-                   <property name="maximumSize">
-                    <size>
-                     <width>30</width>
-                     <height>30</height>
-                    </size>
-                   </property>
-                   <property name="frameShadow">
-                    <enum>QFrame::Plain</enum>
-                   </property>
-                   <property name="text">
-                    <string/>
-                   </property>
-                   <property name="textFormat">
-                    <enum>Qt::PlainText</enum>
-                   </property>
-                   <property name="scaledContents">
-                    <bool>true</bool>
-                   </property>
-                   <property name="alignment">
-                    <set>Qt::AlignCenter</set>
-                   </property>
-                   <property name="textInteractionFlags">
-                    <set>Qt::NoTextInteraction</set>
-                   </property>
-                  </widget>
-                 </item>
+                 <property name="spacing">
+                  <number>0</number>
+                 </property>
+                 <property name="leftMargin">
+                  <number>0</number>
+                 </property>
+                 <property name="topMargin">
+                  <number>0</number>
+                 </property>
+                 <property name="rightMargin">
+                  <number>0</number>
+                 </property>
+                 <property name="bottomMargin">
+                  <number>0</number>
+                 </property>
                 </layout>
                </widget>
               </item>
@@ -2112,6 +2065,12 @@
    <class>ScaledLabel</class>
    <extends>QLabel</extends>
    <header>ui.scaled_label</header>
+  </customwidget>
+  <customwidget>
+   <class>Joystick</class>
+   <extends>QWidget</extends>
+   <header>ui.joystick_widget</header>
+   <container>1</container>
   </customwidget>
  </customwidgets>
  <tabstops>

@@ -12,7 +12,7 @@ import PySide6
 import shiboken6
 from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import QSize, Qt, QThread, Signal, Slot
-from PySide6.QtGui import QColor, QImage, QPixmap
+from PySide6.QtGui import QColor, QImage, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QApplication, QMainWindow
 
 from libs import sender
@@ -27,7 +27,7 @@ from libs.Utility import ospath
 from ui.main_ui import Ui_MainWindow
 from ui.QtextLogger import QPlainTextEditLogger
 
-VERSION = "0.2.2.1 (beta)"
+VERSION = "0.3.0 (beta)"
 Author = "Moi"
 
 # Todo
@@ -60,6 +60,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.is_show_serial = False
         self.keyPress = None
         self.keymap = None
+        self.gui_l_stick = 0
+        self.gui_r_stick = 0
 
         self.setting = Setting()
 
@@ -121,9 +123,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.setting.setting["main_window"]["option"]["window_size_height"],
             )
         # self.pushButtonScreenShot.clicked.connect(self.test)
+        # self.CaptureImageArea.mousePressEvent = self.capture_mousePressEvent
 
     def test(self):
         self.BTN_a.toggle()
+
+    def gui_stick_left(self, angle, r):
+        self.gui_l_stick = r
+        self.keyPress.input(Direction(Stick.LEFT, angle, r))
+
+    def gui_stick_right(self, angle, r):
+        self.gui_r_stick = r
+        self.keyPress.input(Direction(Stick.RIGHT, angle, r))
 
     # <editor-fold desc="ゲームパッド関連">
     def connect_gamepad(self):
@@ -174,6 +185,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.GamepadController_worker.Y_RELEASED.connect(self.release_y)
             self.GamepadController_worker.HOME_RELEASED.connect(self.release_home)
 
+            self.GamepadController_worker.AXIS_MOVED.connect(self.stickMoveEvent, type=Qt.QueuedConnection)
             self.GamepadController_worker.AXIS_MOVED.connect(self.stick_control, type=Qt.DirectConnection)
 
             self.gamepad_l_stick()
@@ -186,6 +198,22 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.logger.debug("コントローラー接続なし")
         except Exception as e:
             self.logger.error(e)
+
+    def stickMoveEvent(self, left_horizontal, left_vertical, right_horizontal, right_vertical):
+        dead_zone = 0.05  # これ以下の傾きは無視(デッドゾーン)
+        left_angle = math.atan2(left_vertical, left_horizontal)
+        left_r = math.sqrt(left_vertical**2 + left_horizontal**2)
+        right_angle = math.atan2(right_vertical, right_horizontal)
+        right_r = math.sqrt(right_vertical**2 + right_horizontal**2)
+
+        # print(left_r, right_r)
+        if left_r < dead_zone:
+            left_r = 0
+        if right_r < dead_zone:
+            right_r = 0
+
+        self.left_stick.stickMoveEvent(left_r, left_angle)
+        self.right_stick.stickMoveEvent(right_r, right_angle)
 
     def reconnect_gamepad(self):
         self.GamepadController_worker.connect_joystick()
@@ -733,7 +761,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # print(left_angle, left_r)
 
-        self.keyPress.input([Direction(Stick.LEFT, left_angle, left_r), Direction(Stick.RIGHT, right_angle, right_r)])
+        if self.gui_l_stick == 0 and self.gui_r_stick == 0:
+            self.keyPress.input(
+                [Direction(Stick.LEFT, left_angle, left_r), Direction(Stick.RIGHT, right_angle, right_r)]
+            )
+        elif self.gui_l_stick > 0 and self.gui_r_stick == 0:
+            self.keyPress.input([Direction(Stick.RIGHT, right_angle, right_r)])
+        elif self.gui_l_stick == 0 and self.gui_r_stick > 0:
+            self.keyPress.input([Direction(Stick.LEFT, left_angle, left_r)])
 
     def gamepad_l_stick(self):
         if self.setting.setting["key_config"]["joystick"]["direction"]["LStick"]:
@@ -759,6 +794,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.thread_1.finished.connect(self.thread_1.deleteLater)
 
     def setup_functions_connect(self):
+
         # controllerボタンの割当
         self.BTN_zl.clicked.connect(self.BTN_click)
         self.BTN_l.clicked.connect(self.BTN_click)
@@ -787,13 +823,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pushButtonReloadPort.clicked.connect(self.activate_serial)
         self.pushButtonScreenShot.clicked.connect(self.screen_shot)
         self.tabWidget.currentChanged.connect(self.set_command_mode)
+        # GUIスティックの割当　(fpsが落ちるのでコントローラー推奨)
+        self.left_stick.stick_signal.connect(self.gui_stick_left, type=Qt.DirectConnection)
+        self.right_stick.stick_signal.connect(self.gui_stick_right, type=Qt.DirectConnection)
 
         # 　各コンボボックス選択時の挙動
         self.comboBoxPython.currentIndexChanged.connect(self.assign_command)
         self.comboBox_MCU.currentIndexChanged.connect(self.assign_command)
 
         # キャプチャ画像クリック時に座標を返すように
-        self.CaptureImageArea.mousePressEvent = self.getPixel
+        self.CaptureImageArea.mousePressEvent = self.capture_mousePressEvent
 
         # Setting.tomlへの保存
         self.lineEditFPS.textChanged.connect(self.assign_fps_to_setting)
@@ -937,19 +976,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             pass
         pass
 
-    def getPixel(self, event):
-        print(event.type)
-        w = self.CaptureImageArea.width()
-        h = self.CaptureImageArea.height()
-        x = event.position().x()
-        x_ = int(x * 1280 / w)
-        y = event.position().y()
-        y_ = int(y * 720 / h)
-        c = self.img.pixel(x_, y_)
-        # c_qobj = QColor
-        c_rgb = QColor(c).getRgb()
-        self.logger.debug(f"Clicked at x:{x_} y:{y_}, R:{c_rgb[0]} G:{c_rgb[1]} B: {c_rgb[2]}")
-        return x, y, c_rgb
+    def capture_mousePressEvent(self, event):
+        if event.modifiers() & QtCore.Qt.ControlModifier:  # Ctrlキーが押されているなら
+            w = self.CaptureImageArea.width()
+            h = self.CaptureImageArea.height()
+            x = event.position().x()
+            x_ = int(x * 1280 / w)
+            y = event.position().y()
+            y_ = int(y * 720 / h)
+            c = self.img.pixel(x_, y_)
+            # c_qobj = QColor
+            c_rgb = QColor(c).getRgb()
+            self.logger.debug(f"Clicked at x:{x_} y:{y_}, R:{c_rgb[0]} G:{c_rgb[1]} B: {c_rgb[2]}")
+            return x, y, c_rgb
 
     def open_screen_shot_dir(self):
         pass
