@@ -1,26 +1,48 @@
+# Description
+![Poke-Controller](https://github.com/KawaSwitch/Poke-Controller)をベースにPySide6で主要機能を再構築したものです。
+
 # Requirements
 
 - python 3.10
+
+# Usage
 - pip install requirements.txt
 - mainwindow.pyを起動
 
-# Todo
 
-## メインウィンドウ
+# feature
+
+Poke-Controllerからの変更点は下記
+- GUI Controller を据え置き型で設置(消すことも再表示することも可能)
+- PCに繋いだコントローラーでSwitchを操作できるように
+  - キー割当は一度`mainwindow.py`を実行後に`game_pad_connect.py`を実行して行う。
+- `Ctrl + マウス左Click`でクリック箇所の座標と色情報表示
+- キーボード操作は不可能
+- 一部基本関数を変更
+  - そもそも実装できていない関数が多いです。
+
+    以下は実装済み(一部関数名に変更あり)
+    - `press`　ボタンなど押下
+    - `wait`　一定時間待機
+    - `is_contain_template`　画像認識
+
+  - `print`はLogに出ません。代わりに`debug`などを使用してください。
+  - 画像認識周りの処理の実装が適当なので、正しく動かない可能性があります。
+
+## 構造
 ---
 
 ベースとなる部分で、GUIのボタンなどから関数の起動(シグナルの発火)やスレッドの呼び出しを行う。
 
-### キャプチャ画像表示は以下のような構造
+### キャプチャ画像表示
 
 - メインウィンドウでthreadをたてる。各workerを各thread上にmoveしてマルチスレッドとする
   - capture用
   - スクリプト実行用
   - コントローラー接続用
     - スティックの状態のみマルチプロセスでworkerが受け取る
-  - (キーボード操作用？)
 - ゲームパッドのキー割当はlibsにあるgame_pad_connect.pyを実行しておこなう
-- 
+- キーボード操作はそのうち実装したい
 
 
 ## License
