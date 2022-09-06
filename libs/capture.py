@@ -1,5 +1,7 @@
+import copy
 import logging
 import os
+import pathlib
 import threading
 import time
 from datetime import datetime
@@ -9,7 +11,7 @@ import cv2
 import numpy
 import numpy as np
 from PySide6.QtCore import QObject, QSize, Qt, QThread, Signal, Slot
-from PySide6.QtGui import QImage
+from PySide6.QtGui import QImage, QColor, QPainter, QPen
 
 
 class CaptureWorker(QObject):
@@ -28,7 +30,10 @@ class CaptureWorker(QObject):
         self.status = True
         self.cap = True
         self.frame = None
+        self.rect_draw = True
+        self.rect_list = []
         self.camera_id = camera_id
+        self.painter = QPainter()
         # self.a = np.zeros((720, 1280, 3))
         # self.shm = shared_memory.SharedMemory(create=True, size=self.a.nbytes, name='cam')  # 共有メモリを作成
         # self.mp_frame = np.ndarray(self.a.shape, dtype=self.a.dtype, buffer=self.shm.buf)
@@ -45,7 +50,7 @@ class CaptureWorker(QObject):
                     # self.image_rgb = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
                     h, w, ch = self.frame.shape
                     bytes_per_line = ch * w
-                    image = QImage(self.frame, w, h, bytes_per_line, QImage.Format.Format_BGR888)
+                    image = self.generate_image(w, h, bytes_per_line)
                     self.change_pixmap_signal.emit(image)
                 # h, w, ch = self.mp_frame.shape
                 # bytes_per_line = ch * w
@@ -53,6 +58,31 @@ class CaptureWorker(QObject):
                 # self.change_pixmap_signal.emit(image)
                 time.sleep(max(1 / self.fps - (time.perf_counter() - start), 0))
         self.destroy()
+
+    def generate_image(self, w, h, bytes_per_line):
+        img = QImage(copy.deepcopy(self.frame), w, h, bytes_per_line, QImage.Format.Format_BGR888)
+        if self.rect_list:
+            self.rect_draw = True
+            # print(self.rect_list)
+            for r_list in self.rect_list:
+                if r_list[5] < 0:
+                    self.rect_list.remove(r_list)
+                r_list[5] -= 1
+        else:
+            self.rect_draw = False
+        if self.rect_draw:
+            self.painter.begin(img)
+            pen = QPen()
+            for r_list in self.rect_list:
+                pen.setColor(r_list[4])
+                pen.setWidth(2)
+                self.painter.setPen(pen)
+                self.painter.drawRect(r_list[0], r_list[1], r_list[2], r_list[3])
+                # self.painter.fillRect(0, 0, 640, 720, QColor(0, 255, 0, 127))
+            self.painter.end()
+
+            pass
+        return img
 
     def open_camera(self, camera_id):
         # self.p.kill()
@@ -98,20 +128,22 @@ class CaptureWorker(QObject):
 
         if crop is None:
             image = self.frame
-        elif crop is 1 or crop is "1":
-            image = self.frame[crop_ax[1] : crop_ax[3], crop_ax[0] : crop_ax[2]]
-        elif crop is 2 or crop is "2":
-            image = self.frame[crop_ax[1] : crop_ax[1] + crop_ax[3], crop_ax[0] : crop_ax[0] + crop_ax[2]]
+        elif crop == 1 or crop == "1":
+            image = self.frame[crop_ax[1]: crop_ax[3], crop_ax[0]: crop_ax[2]]
+        elif crop == 2 or crop == "2":
+            image = self.frame[crop_ax[1]: crop_ax[1] + crop_ax[3], crop_ax[0]: crop_ax[0] + crop_ax[2]]
         elif img is not None:
             image = img
         else:
             image = self.frame
 
-        if not os.path.exists(capture_dir):
-            os.makedirs(capture_dir)
+        capture_dir = pathlib.Path(capture_dir)
+
+        if not capture_dir.exists():
+            capture_dir.mkdir(parents=True, exist_ok=True)
             self.debug("Created Capture folder")
 
-        save_path = os.path.join(capture_dir, filename)
+        save_path = capture_dir / filename
 
         ret = self.imwrite(save_path, image)
         if ret:
@@ -122,7 +154,7 @@ class CaptureWorker(QObject):
     def imwrite(self, filename, img, params=None):
         try:
             ext = os.path.splitext(filename)[1]
-            result, n = cv2.imencode(ext, img, params)
+            result, n = cv2.imencode(".png", img, params)
 
             if result:
                 with open(filename, mode="w+b") as f:
@@ -150,9 +182,9 @@ class CaptureWorker(QObject):
 
     @Slot(bool)
     def callback_return_img(self, bl: bool):
-        print("RECEIVE SIGNAL")
+        # print("RECEIVE SIGNAL")
         if bl:
-            print("SEND IMG")
+            # print("SEND IMG")
             self.send_img.emit(self.frame)
 
     # ログをメインに飛ばすため

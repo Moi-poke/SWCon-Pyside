@@ -1,21 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import logging
 import math
 import os
 import platform
 import time
-from logging import DEBUG, NullHandler, getLogger
+from logging import DEBUG, NullHandler, StreamHandler, getLogger
 
 import serial
+from PySide6.QtCore import QObject, QSize, Qt, QThread, Signal, Slot
 
 
-class Sender:
+class Sender(QObject):
+
+    print_strings = Signal(str, type(logging.DEBUG))
+
     def __init__(self, is_show_serial, if_print=True):
+        super().__init__()
         self.ser = None
         self.is_show_serial = is_show_serial
 
         self._logger = getLogger(__name__)
         self._logger.addHandler(NullHandler())
+        self._logger.addHandler(StreamHandler())
         self._logger.setLevel(DEBUG)
         self._logger.propagate = True
 
@@ -51,19 +58,19 @@ class Sender:
         try:
             if portName is None or portName == "":
                 if os.name == "nt":
-                    print("connecting to " + "COM" + str(portNum))
-                    self._logger.info("connecting to " + "COM" + str(portNum))
+                    # print("connecting to " + "COM" + str(portNum))
+                    self._logger.info("Connecting to " + "COM" + str(portNum))
                     self.ser = serial.Serial("COM" + str(portNum), 9600)
                     return True
                 elif os.name == "posix":
                     if platform.system() == "Darwin":
                         print("connecting to " + "/dev/tty.usbserial-" + str(portNum))
-                        self._logger.info("connecting to " + "/dev/tty.usbserial-" + str(portNum))
+                        self._logger.info("Connecting to " + "/dev/tty.usbserial-" + str(portNum))
                         self.ser = serial.Serial("/dev/tty.usbserial-" + str(portNum), 9600)
                         return True
                     else:
                         print("connecting to " + "/dev/ttyUSB" + str(portNum))
-                        self._logger.info("connecting to " + "/dev/ttyUSB" + str(portNum))
+                        self._logger.info("Connecting to " + "/dev/ttyUSB" + str(portNum))
                         self.ser = serial.Serial("/dev/ttyUSB" + str(portNum), 9600)
                         return True
                 else:
@@ -71,12 +78,12 @@ class Sender:
                     self._logger.warning("Not supported OS")
                     return False
             else:
-                print("connecting to " + portName)
+                print("Connecting to " + portName)
                 self._logger.info("connecting to " + portName)
                 self.ser = serial.Serial(portName, 9600)
                 return True
         except IOError as e:
-            print("COM Port: can't be established")
+            # print("COM Port: can't be established")
             self._logger.error("COM Port: can't be established", e)
             # print(e)
             return False
@@ -98,18 +105,21 @@ class Sender:
 
             self.ser.write((row + "\r\n").encode("utf-8"))
             self.time_aft = time.perf_counter()
+
+            if self.is_show_serial and row != "0x0000 8" and row != self.before:
+                # print(row)
+                self.debug(row)
             self.before = row
         except serial.serialutil.SerialException as e:
             # print(e)
-            self._logger.error(f"Error : {e}")
+            # self._logger.error(f"Error : {e}")
+            pass
         except AttributeError as e:
             print("Using a port that is not open.")
             self._logger.error("Maybe Using a port that is not open.")
             self._logger.error(e)
         # self._logger.debug(f"{row}")
         # Show sending serial datas
-        if self.is_show_serial:
-            print(row)
 
     def show_input(self, output):
         try:
@@ -118,7 +128,7 @@ class Sender:
             useRStick = int(output[0], 16) >> 0 & 1
             useLStick = int(output[0], 16) >> 1 & 1
             Hat = self.Hat[int(output[1])]
-            if Hat is not "CENTER":
+            if Hat != "CENTER":
                 btns = btns + ["Hat." + str(Hat)]
             LStick = list(map(lambda x: int(x, 16), output[2:4]))
             RStick = list(map(lambda x: int(x, 16), output[4:]))
@@ -320,3 +330,19 @@ class Sender:
                         )
         except Exception as e:
             self._logger.error("Error:", e)
+
+    # ログをメインに飛ばすため
+    def debug(self, s, force=False):
+        self.print_strings.emit(s, logging.DEBUG)
+
+    def info(self, s, force=False):
+        self.print_strings.emit(s, logging.INFO)
+
+    def warning(self, s, force=False):
+        self.print_strings.emit(s, logging.WARNING)
+
+    def error(self, s, force=False):
+        self.print_strings.emit(s, logging.ERROR)
+
+    def critical(self, s, force=False):
+        self.print_strings.emit(s, logging.CRITICAL)

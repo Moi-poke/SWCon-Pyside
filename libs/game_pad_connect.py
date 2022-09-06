@@ -1,10 +1,16 @@
+import logging
 import os
 import sys
 import threading
 import time
 from multiprocessing import Array, Process, shared_memory
+from os import environ
 
 import numpy as np
+
+environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
+from logging import DEBUG, NullHandler, StreamHandler, getLogger
+
 import pygame
 import pygame.locals
 import PySide6
@@ -573,14 +579,24 @@ class GamepadController(QObject):
 
     AXIS_MOVED = QtCore.Signal(float, float, float, float)
 
+    
+    print_strings = QtCore.Signal(str, type(logging.DEBUG))
+
     def __init__(self):
         super(GamepadController, self).__init__()
+
+        self.logger = getLogger(__name__)
+        self.logger.addHandler(NullHandler())
+        self.logger.addHandler(StreamHandler())
+        self.logger.setLevel(DEBUG)
+        self.logger.propagate = True
         self.use_Rstick = None
         self.use_Lstick = None
         self.is_alive = True
         self.keymap = {}
         self.pause = False
         self.p = None
+        self.isCanceled= False
         pygame.init()
         self.connect_joystick()
 
@@ -593,17 +609,18 @@ class GamepadController(QObject):
         self.stick = np.ndarray(self._stick.shape, dtype=self._stick.dtype, buffer=self.shm.buf)
 
     def connect_joystick(self):
+        self.debug("Connect Joystick")
         try:
             pygame.joystick.init()
             self.joystick_ = pygame.joystick.Joystick(0)
             self.joystick_.init()
-            print("init joystick")
+            self.debug("Connected")
             self.no_joystick = False
             self.reconnect_subprocess()
             return True
         except:            
             self.no_joystick = True
-            print("No joystick")
+            self.debug("No joystick")
             return False
 
     def reconnect_subprocess(self):
@@ -638,226 +655,233 @@ class GamepadController(QObject):
             # print(f"running {threading.get_ident()}")
             start = time.perf_counter()
 
-            if self.use_Lstick and self.use_Rstick:
-                # self.AXIS_MOVED.emit(
-                #     self.joystick_.get_axis(0),  # left horizontal
-                #     self.joystick_.get_axis(1),  # left vertical
-                #     self.joystick_.get_axis(2),  # right horizontal
-                #     self.joystick_.get_axis(3),  # right vertical
-                # )
-                self.AXIS_MOVED.emit(
-                    self.stick[0][0],  # left horizontal
-                    self.stick[1][0],  # left vertical
-                    self.stick[2][0],  # right horizontal
-                    self.stick[3][0],  # right vertical
-                )
-            elif self.use_Lstick:
-                # self.AXIS_MOVED.emit(
-                #     self.joystick_.get_axis(0),  # left horizontal
-                #     self.joystick_.get_axis(1),  # left vertical
-                #     0,
-                #     0,
-                # )
-                self.AXIS_MOVED.emit(
-                    self.stick[0][0],  # left horizontal
-                    self.stick[1][0],  # left vertical
-                    0,
-                    0,
-                )
-            elif self.use_Rstick:
-                # self.AXIS_MOVED.emit(
-                #     0,
-                #     0,
-                #     self.joystick_.get_axis(2),  # right horizontal
-                #     self.joystick_.get_axis(3),  # right vertical
-                # )
-                self.AXIS_MOVED.emit(
-                    0,
-                    0,
-                    self.stick[2][0],  # right horizontal
-                    self.stick[3][0],  # right vertical
-                )
-            for e in pygame.event.get():
-                # print(type(e))
-                match e.type:
-                    case pygame.locals.JOYAXISMOTION:
-                        if self.keymap.get(f"axis.{e.axis}") is not None:  # ここはキー入力なので値を1, -1に丸めてもよい
-                            # print("axis, ", self.keymap.get(f"axis.{e.axis}"), self.joystick.get_axis(e.axis))
-                            val = int(round(self.joystick_.get_axis(e.axis), 0))
-                            match self.keymap.get(f"axis.{e.axis}"):
-                                case "ZL":
-                                    if val == 1:
-                                        self.ZL_PRESSED.emit()
-                                    elif val == -1:
-                                        self.ZL_RELEASED.emit()
-                                case "L":
-                                    if val == 1:
-                                        self.L_PRESSED.emit()
-                                    elif val == -1:
-                                        self.L_RELEASED.emit()
-                                case "LCLICK":
-                                    if val == 1:
-                                        self.LCLICK_PRESSED.emit()
-                                    elif val == -1:
-                                        self.LCLICK_RELEASED.emit()
-                                case "MINUS":
-                                    if val == 1:
-                                        self.MINUS_PRESSED.emit()
-                                    elif val == -1:
-                                        self.MINUS_RELEASED.emit()
-                                case "TOP":
-                                    if val == 1:
-                                        self.TOP_PRESSED.emit()
-                                    elif val == -1:
-                                        self.TOP_RELEASED.emit()
-                                case "BTM":
-                                    if val == 1:
-                                        self.BTM_PRESSED.emit()
-                                    elif val == -1:
-                                        self.BTM_RELEASED.emit()
-                                case "LEFT":
-                                    if val == 1:
-                                        self.LEFT_PRESSED.emit()
-                                    elif val == -1:
-                                        self.LEFT_RELEASED.emit()
-                                case "RIGHT":
-                                    if val == 1:
-                                        self.RIGHT_PRESSED.emit()
-                                    elif val == -1:
-                                        self.RIGHT_RELEASED.emit()
-                                case "CAPTURE":
-                                    if val == 1:
-                                        self.CAPTURE_PRESSED.emit()
-                                    elif val == -1:
-                                        self.CAPTURE_RELEASED.emit()
-                                case "ZR":
-                                    if val == 1:
-                                        self.ZR_PRESSED.emit()
-                                    elif val == -1:
-                                        self.ZR_RELEASED.emit()
-                                case "R":
-                                    if val == 1:
-                                        self.R_PRESSED.emit()
-                                    elif val == -1:
-                                        self.R_RELEASED.emit()
-                                case "RCLICK":
-                                    if val == 1:
-                                        self.RCLICK_PRESSED.emit()
-                                    elif val == -1:
-                                        self.RCLICK_RELEASED.emit()
-                                case "PLUS":
-                                    if val == 1:
-                                        self.PLUS_PRESSED.emit()
-                                    elif val == -1:
-                                        self.PLUS_RELEASED.emit()
-                                case "A":
-                                    if val == 1:
-                                        self.A_PRESSED.emit()
-                                    elif val == -1:
-                                        self.A_RELEASED.emit()
-                                case "B":
-                                    if val == 1:
-                                        self.B_PRESSED.emit()
-                                    elif val == -1:
-                                        self.B_RELEASED.emit()
-                                case "X":
-                                    if val == 1:
-                                        self.X_PRESSED.emit()
-                                    elif val == -1:
-                                        self.X_RELEASED.emit()
-                                case "Y":
-                                    if val == 1:
-                                        self.Y_PRESSED.emit()
-                                    elif val == -1:
-                                        self.Y_RELEASED.emit()
-                                case "HOME":
-                                    if val == 1:
-                                        self.HOME_PRESSED.emit()
-                                    elif val == -1:
-                                        self.HOME_RELEASED.emit()
+            try:
+                if self.use_Lstick and self.use_Rstick:
+                    # self.AXIS_MOVED.emit(
+                    #     self.joystick_.get_axis(0),  # left horizontal
+                    #     self.joystick_.get_axis(1),  # left vertical
+                    #     self.joystick_.get_axis(2),  # right horizontal
+                    #     self.joystick_.get_axis(3),  # right vertical
+                    # )
+                    self.AXIS_MOVED.emit(
+                        self.stick[0][0],  # left horizontal
+                        self.stick[1][0],  # left vertical
+                        self.stick[2][0],  # right horizontal
+                        self.stick[3][0],  # right vertical
+                    )
+                elif self.use_Lstick:
+                    # self.AXIS_MOVED.emit(
+                    #     self.joystick_.get_axis(0),  # left horizontal
+                    #     self.joystick_.get_axis(1),  # left vertical
+                    #     0,
+                    #     0,
+                    # )
+                    self.AXIS_MOVED.emit(
+                        self.stick[0][0],  # left horizontal
+                        self.stick[1][0],  # left vertical
+                        0,
+                        0,
+                    )
+                elif self.use_Rstick:
+                    # self.AXIS_MOVED.emit(
+                    #     0,
+                    #     0,
+                    #     self.joystick_.get_axis(2),  # right horizontal
+                    #     self.joystick_.get_axis(3),  # right vertical
+                    # )
+                    self.AXIS_MOVED.emit(
+                        0,
+                        0,
+                        self.stick[2][0],  # right horizontal
+                        self.stick[3][0],  # right vertical
+                    )
+                for e in pygame.event.get():
+                    # print(type(e))
+                    try:
+                        match e.type:
+                            case pygame.locals.JOYAXISMOTION:
+                                if self.keymap.get(f"axis.{e.axis}") is not None:  # ここはキー入力なので値を1, -1に丸めてもよい
+                                    # print("axis, ", self.keymap.get(f"axis.{e.axis}"), self.joystick.get_axis(e.axis))
+                                    val = int(round(self.joystick_.get_axis(e.axis), 0))
+                                    match self.keymap.get(f"axis.{e.axis}"):
+                                        case "ZL":
+                                            if val == 1:
+                                                self.ZL_PRESSED.emit()
+                                            elif val == -1:
+                                                self.ZL_RELEASED.emit()
+                                        case "L":
+                                            if val == 1:
+                                                self.L_PRESSED.emit()
+                                            elif val == -1:
+                                                self.L_RELEASED.emit()
+                                        case "LCLICK":
+                                            if val == 1:
+                                                self.LCLICK_PRESSED.emit()
+                                            elif val == -1:
+                                                self.LCLICK_RELEASED.emit()
+                                        case "MINUS":
+                                            if val == 1:
+                                                self.MINUS_PRESSED.emit()
+                                            elif val == -1:
+                                                self.MINUS_RELEASED.emit()
+                                        case "TOP":
+                                            if val == 1:
+                                                self.TOP_PRESSED.emit()
+                                            elif val == -1:
+                                                self.TOP_RELEASED.emit()
+                                        case "BTM":
+                                            if val == 1:
+                                                self.BTM_PRESSED.emit()
+                                            elif val == -1:
+                                                self.BTM_RELEASED.emit()
+                                        case "LEFT":
+                                            if val == 1:
+                                                self.LEFT_PRESSED.emit()
+                                            elif val == -1:
+                                                self.LEFT_RELEASED.emit()
+                                        case "RIGHT":
+                                            if val == 1:
+                                                self.RIGHT_PRESSED.emit()
+                                            elif val == -1:
+                                                self.RIGHT_RELEASED.emit()
+                                        case "CAPTURE":
+                                            if val == 1:
+                                                self.CAPTURE_PRESSED.emit()
+                                            elif val == -1:
+                                                self.CAPTURE_RELEASED.emit()
+                                        case "ZR":
+                                            if val == 1:
+                                                self.ZR_PRESSED.emit()
+                                            elif val == -1:
+                                                self.ZR_RELEASED.emit()
+                                        case "R":
+                                            if val == 1:
+                                                self.R_PRESSED.emit()
+                                            elif val == -1:
+                                                self.R_RELEASED.emit()
+                                        case "RCLICK":
+                                            if val == 1:
+                                                self.RCLICK_PRESSED.emit()
+                                            elif val == -1:
+                                                self.RCLICK_RELEASED.emit()
+                                        case "PLUS":
+                                            if val == 1:
+                                                self.PLUS_PRESSED.emit()
+                                            elif val == -1:
+                                                self.PLUS_RELEASED.emit()
+                                        case "A":
+                                            if val == 1:
+                                                self.A_PRESSED.emit()
+                                            elif val == -1:
+                                                self.A_RELEASED.emit()
+                                        case "B":
+                                            if val == 1:
+                                                self.B_PRESSED.emit()
+                                            elif val == -1:
+                                                self.B_RELEASED.emit()
+                                        case "X":
+                                            if val == 1:
+                                                self.X_PRESSED.emit()
+                                            elif val == -1:
+                                                self.X_RELEASED.emit()
+                                        case "Y":
+                                            if val == 1:
+                                                self.Y_PRESSED.emit()
+                                            elif val == -1:
+                                                self.Y_RELEASED.emit()
+                                        case "HOME":
+                                            if val == 1:
+                                                self.HOME_PRESSED.emit()
+                                            elif val == -1:
+                                                self.HOME_RELEASED.emit()
 
-                    case pygame.locals.JOYBUTTONDOWN:
+                            case pygame.locals.JOYBUTTONDOWN:
 
-                        # print(self.btn_down)
-                        if self.keymap.get(f"button.{e.button}") is not None:
-                            # print("button-down, ", self.keymap.get(f"button.{e.button}"))
-                            match self.keymap.get(f"button.{e.button}"):
-                                case "ZL":
-                                    self.ZL_PRESSED.emit()
-                                case "L":
-                                    self.L_PRESSED.emit()
-                                case "LCLICK":
-                                    self.LCLICK_PRESSED.emit()
-                                case "MINUS":
-                                    self.MINUS_PRESSED.emit()
-                                case "TOP":
-                                    self.TOP_PRESSED.emit()
-                                case "BTM":
-                                    self.BTM_PRESSED.emit()
-                                case "LEFT":
-                                    self.LEFT_PRESSED.emit()
-                                case "RIGHT":
-                                    self.RIGHT_PRESSED.emit()
-                                case "CAPTURE":
-                                    self.CAPTURE_PRESSED.emit()
-                                case "ZR":
-                                    self.ZR_PRESSED.emit()
-                                case "R":
-                                    self.R_PRESSED.emit()
-                                case "RCLICK":
-                                    self.RCLICK_PRESSED.emit()
-                                case "PLUS":
-                                    self.PLUS_PRESSED.emit()
-                                case "A":
-                                    self.A_PRESSED.emit()
-                                case "B":
-                                    self.B_PRESSED.emit()
-                                case "X":
-                                    self.X_PRESSED.emit()
-                                case "Y":
-                                    self.Y_PRESSED.emit()
-                                case "HOME":
-                                    self.HOME_PRESSED.emit()
-                    case pygame.locals.JOYBUTTONUP:
-                        if self.keymap.get(f"button.{e.button}") is not None:
-                            # print("button-up, ", self.keymap.get(f"button.{e.button}"))
-                            match self.keymap.get(f"button.{e.button}"):
-                                case "ZL":
-                                    self.ZL_RELEASED.emit()
-                                case "L":
-                                    self.L_RELEASED.emit()
-                                case "LCLICK":
-                                    self.LCLICK_RELEASED.emit()
-                                case "MINUS":
-                                    self.MINUS_RELEASED.emit()
-                                case "TOP":
-                                    self.TOP_RELEASED.emit()
-                                case "BTM":
-                                    self.BTM_RELEASED.emit()
-                                case "LEFT":
-                                    self.LEFT_RELEASED.emit()
-                                case "RIGHT":
-                                    self.RIGHT_RELEASED.emit()
-                                case "CAPTURE":
-                                    self.CAPTURE_RELEASED.emit()
-                                case "ZR":
-                                    self.ZR_RELEASED.emit()
-                                case "R":
-                                    self.R_RELEASED.emit()
-                                case "RCLICK":
-                                    self.RCLICK_RELEASED.emit()
-                                case "PLUS":
-                                    self.PLUS_RELEASED.emit()
-                                case "A":
-                                    self.A_RELEASED.emit()
-                                case "B":
-                                    self.B_RELEASED.emit()
-                                case "X":
-                                    self.X_RELEASED.emit()
-                                case "Y":
-                                    self.Y_RELEASED.emit()
-                                case "HOME":
-                                    self.HOME_RELEASED.emit()
+                                # print(self.btn_down)
+                                if self.keymap.get(f"button.{e.button}") is not None:
+                                    # print("button-down, ", self.keymap.get(f"button.{e.button}"))
+                                    match self.keymap.get(f"button.{e.button}"):
+                                        case "ZL":
+                                            self.ZL_PRESSED.emit()
+                                        case "L":
+                                            self.L_PRESSED.emit()
+                                        case "LCLICK":
+                                            self.LCLICK_PRESSED.emit()
+                                        case "MINUS":
+                                            self.MINUS_PRESSED.emit()
+                                        case "TOP":
+                                            self.TOP_PRESSED.emit()
+                                        case "BTM":
+                                            self.BTM_PRESSED.emit()
+                                        case "LEFT":
+                                            self.LEFT_PRESSED.emit()
+                                        case "RIGHT":
+                                            self.RIGHT_PRESSED.emit()
+                                        case "CAPTURE":
+                                            self.CAPTURE_PRESSED.emit()
+                                        case "ZR":
+                                            self.ZR_PRESSED.emit()
+                                        case "R":
+                                            self.R_PRESSED.emit()
+                                        case "RCLICK":
+                                            self.RCLICK_PRESSED.emit()
+                                        case "PLUS":
+                                            self.PLUS_PRESSED.emit()
+                                        case "A":
+                                            self.A_PRESSED.emit()
+                                        case "B":
+                                            self.B_PRESSED.emit()
+                                        case "X":
+                                            self.X_PRESSED.emit()
+                                        case "Y":
+                                            self.Y_PRESSED.emit()
+                                        case "HOME":
+                                            self.HOME_PRESSED.emit()
+                            case pygame.locals.JOYBUTTONUP:
+                                if self.keymap.get(f"button.{e.button}") is not None:
+                                    # print("button-up, ", self.keymap.get(f"button.{e.button}"))
+                                    match self.keymap.get(f"button.{e.button}"):
+                                        case "ZL":
+                                            self.ZL_RELEASED.emit()
+                                        case "L":
+                                            self.L_RELEASED.emit()
+                                        case "LCLICK":
+                                            self.LCLICK_RELEASED.emit()
+                                        case "MINUS":
+                                            self.MINUS_RELEASED.emit()
+                                        case "TOP":
+                                            self.TOP_RELEASED.emit()
+                                        case "BTM":
+                                            self.BTM_RELEASED.emit()
+                                        case "LEFT":
+                                            self.LEFT_RELEASED.emit()
+                                        case "RIGHT":
+                                            self.RIGHT_RELEASED.emit()
+                                        case "CAPTURE":
+                                            self.CAPTURE_RELEASED.emit()
+                                        case "ZR":
+                                            self.ZR_RELEASED.emit()
+                                        case "R":
+                                            self.R_RELEASED.emit()
+                                        case "RCLICK":
+                                            self.RCLICK_RELEASED.emit()
+                                        case "PLUS":
+                                            self.PLUS_RELEASED.emit()
+                                        case "A":
+                                            self.A_RELEASED.emit()
+                                        case "B":
+                                            self.B_RELEASED.emit()
+                                        case "X":
+                                            self.X_RELEASED.emit()
+                                        case "Y":
+                                            self.Y_RELEASED.emit()
+                                        case "HOME":
+                                            self.HOME_RELEASED.emit()
+                    except:
+                        pass
+            except RuntimeError:
+                pass
+
             time.sleep(max(1 / 60 - (time.perf_counter() - start), 0.0001))
 
         print("DEAD")
@@ -870,9 +894,42 @@ class GamepadController(QObject):
         self.is_alive = False
         self.p.kill()
 
+    
+    # ログをメインに飛ばすため
+    def debug(self, s, force=False):
+        if force or not self.isCanceled:
+            s = f"thread id={threading.get_ident()} " + str(s)
+            self.print_strings.emit(s, logging.DEBUG)
+
+    def info(self, s, force=False):
+        if force or not self.isCanceled:
+            s = f"thread id={threading.get_ident()} " + str(s)
+            self.print_strings.emit(s, logging.INFO)
+
+    def warning(self, s, force=False):
+        if force or not self.isCanceled:
+            s = f"thread id={threading.get_ident()} " + str(s)
+            self.print_strings.emit(s, logging.WARNING)
+
+    def error(self, s, force=False):
+        if force or not self.isCanceled:
+            s = f"thread id={threading.get_ident()} " + str(s)
+            self.print_strings.emit(s, logging.ERROR)
+
+    def critical(self, s, force=False):
+        if force or not self.isCanceled:
+            s = f"thread id={threading.get_ident()} " + str(s)
+            self.print_strings.emit(s, logging.CRITICAL)
+
 
 def j_stick():
-    print(os.getpid())
+    logger = getLogger(__name__)
+    logger.addHandler(NullHandler())
+    logger.addHandler(StreamHandler())
+    logger.setLevel(DEBUG)
+    logger.propagate = True
+    logger.debug(f"スティック情報取得プロセスID: {os.getpid()}")
+
     pygame.init()
     pygame.joystick.init()
     joystick = pygame.joystick.Joystick(0)
