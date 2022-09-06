@@ -1,10 +1,13 @@
 import logging
 import math
 import os
+import platform
 import queue
 import sys
 import time
+from ctypes import *
 from logging import getLogger
+from pathlib import Path
 from typing import Optional
 
 import cv2
@@ -13,10 +16,11 @@ import shiboken6
 from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import QSize, Qt, QThread, Signal, Slot
 from PySide6.QtGui import QColor, QImage, QPainter, QPen, QPixmap
-from PySide6.QtWidgets import QApplication, QMainWindow
+from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox
 
 from libs import sender
 from libs.capture import CaptureWorker
+from libs.com_port_assist import serial_ports
 from libs.CommandBase import CommandBase
 from libs.CommandLoader import CommandLoader
 from libs.game_pad_connect import GamepadController
@@ -27,8 +31,9 @@ from libs.Utility import ospath
 from ui.main_ui import Ui_MainWindow
 from ui.QtextLogger import QPlainTextEditLogger
 
-VERSION = "0.3.0 (beta)"
+VERSION = "0.4.0 (beta)"
 Author = "Moi"
+
 
 # Todo
 # GUIの起動
@@ -36,9 +41,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     stop_request = Signal(bool)
 
     def __init__(
-        self,
-        parent: Optional[PySide6.QtWidgets.QWidget] = None,
-        flags: PySide6.QtCore.Qt.WindowFlags = QtCore.Qt.Window,
+            self,
+            parent: Optional[PySide6.QtWidgets.QWidget] = None,
+            flags: PySide6.QtCore.Qt.WindowFlags = QtCore.Qt.Window,
     ) -> None:
         """_summary_
 
@@ -91,6 +96,25 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.q: queue.Queue = queue.Queue()
         self.setup_functions_connect()
+
+        try:
+            # camera名取得はうまくいかない
+            if platform.system() == 'Windows':
+                import clr
+                clr.AddReference("./DirectShowLib/DirectShowLib-2005")
+                from DirectShowLib import DsDevice, FilterCategory
+
+                # print(DirectShowLib)
+                capture_devices = DsDevice.GetDevicesOfCat(FilterCategory.VideoInputDevice)
+                self.camera_dic = {cam_id: device.Name for cam_id, device in enumerate(capture_devices)}
+                self.camera_dic[str(max(list(self.camera_dic.keys())) + 1)] = ''
+                print([device for device in self.camera_dic.values()])
+            else:
+                self.comboBoxCameraNames.setDisabled(True)
+        except Exception as e:
+            self.comboBoxCameraNames.setDisabled(True)
+            pass
+
         self.connect_capture()
 
         # You can format what is printed to text box
@@ -102,26 +126,32 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pushButtonClearLog.pressed.connect(self.plainTextEdit.widget.clear)
 
         self.ser = sender.Sender(self.is_show_serial)
+        self.ser.print_strings.connect(self.callback_string_to_log)
         self.activate_serial()
         self.activate_keyboard()
         self.connect_gamepad()
         self.load_commands()
+        self.show_serial()
 
         try:
             self.comboBox_MCU.setCurrentIndex(self.comboBoxPython.findText(mcu_cmd))
             self.comboBoxPython.setCurrentIndex(self.comboBoxPython.findText(py_cmd))
         except Exception as e:
-            self.logger.debug("No Script?")
+            self.logger.debug("There seems to have been a change in the script.")
 
         # スレッドの開始
-        self.thread_1.start()
+        if self.thread_1 is not None:
+            self.thread_1.start()
         self.GamepadController_thread.start()
 
         if self.setting is not None:
-            self.resize(
-                self.setting.setting["main_window"]["option"]["window_size_width"],
-                self.setting.setting["main_window"]["option"]["window_size_height"],
-            )
+            if self.setting.setting["main_window"]["option"]["window_showMaximized"]:
+                self.showMaximized()
+            else:
+                self.resize(
+                    self.setting.setting["main_window"]["option"]["window_size_width"],
+                    self.setting.setting["main_window"]["option"]["window_size_height"],
+                )
         # self.pushButtonScreenShot.clicked.connect(self.test)
         # self.CaptureImageArea.mousePressEvent = self.capture_mousePressEvent
 
@@ -188,6 +218,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.GamepadController_worker.AXIS_MOVED.connect(self.stickMoveEvent, type=Qt.QueuedConnection)
             self.GamepadController_worker.AXIS_MOVED.connect(self.stick_control, type=Qt.DirectConnection)
 
+            self.GamepadController_worker.print_strings.connect(self.callback_string_to_log, type=Qt.QueuedConnection)
+
             self.gamepad_l_stick()
             self.gamepad_r_stick()
 
@@ -202,9 +234,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def stickMoveEvent(self, left_horizontal, left_vertical, right_horizontal, right_vertical):
         dead_zone = 0.05  # これ以下の傾きは無視(デッドゾーン)
         left_angle = math.atan2(left_vertical, left_horizontal)
-        left_r = math.sqrt(left_vertical**2 + left_horizontal**2)
+        left_r = math.sqrt(left_vertical ** 2 + left_horizontal ** 2)
         right_angle = math.atan2(right_vertical, right_horizontal)
-        right_r = math.sqrt(right_vertical**2 + right_horizontal**2)
+        right_r = math.sqrt(right_vertical ** 2 + right_horizontal ** 2)
 
         # print(left_r, right_r)
         if left_r < dead_zone:
@@ -749,9 +781,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def stick_control(self, left_horizontal, left_vertical, right_horizontal, right_vertical):
         dead_zone = 0.05  # これ以下の傾きは無視(デッドゾーン)
         left_angle = -math.degrees(math.atan2(left_vertical, left_horizontal))
-        left_r = math.sqrt(left_vertical**2 + left_horizontal**2)
+        left_r = math.sqrt(left_vertical ** 2 + left_horizontal ** 2)
         right_angle = -math.degrees(math.atan2(right_vertical, right_horizontal))
-        right_r = math.sqrt(right_vertical**2 + right_horizontal**2)
+        right_r = math.sqrt(right_vertical ** 2 + right_horizontal ** 2)
 
         # print(left_r, right_r)
         if left_r < dead_zone:
@@ -782,7 +814,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def connect_capture(self):
         self.thread_1 = QThread()
-        self.capture_worker = CaptureWorker(camera_id=int(self.lineEditCameraID.text()))
+        try:
+            self.capture_worker = CaptureWorker(camera_id=int(self.lineEditCameraID.text()))
+        except:
+            self.capture_worker = CaptureWorker(camera_id=-1)
+
         self.capture_worker.moveToThread(self.thread_1)
 
         self.capture_worker.change_pixmap_signal.connect(self.update_image, type=Qt.QueuedConnection)
@@ -818,16 +854,25 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # 各ボタンの関数割当
         self.pushButton_PythonStart.pressed.connect(self.start_command)
         self.pushButton_PythonStop.pressed.connect(self.stop_command)
+
+        self.pushButton_MCUStart.pressed.connect(self.start_mcu_command)
+        self.pushButton_MCUStop.pressed.connect(self.stop_mcu_command)
+
         self.pushButton_PythonReload.clicked.connect(self.reload_commands)
         self.pushButton_MCUReload.clicked.connect(self.reload_commands)
+
         self.pushButtonReloadPort.clicked.connect(self.activate_serial)
         self.pushButtonScreenShot.clicked.connect(self.screen_shot)
+        self.toolButtonOpenScreenShotDir.clicked.connect(self.open_screen_shot_dir)
+        self.toolButtonOpenPythonDir.clicked.connect(self.open_python_shot_dir)
+        self.toolButton_OpenMCUDir.clicked.connect(self.open_mcu_shot_dir)
         self.tabWidget.currentChanged.connect(self.set_command_mode)
         # GUIスティックの割当　(fpsが落ちるのでコントローラー推奨)
         self.left_stick.stick_signal.connect(self.gui_stick_left, type=Qt.DirectConnection)
         self.right_stick.stick_signal.connect(self.gui_stick_right, type=Qt.DirectConnection)
 
         # 　各コンボボックス選択時の挙動
+        self.tabWidget.currentChanged.connect(self.assign_command)
         self.comboBoxPython.currentIndexChanged.connect(self.assign_command)
         self.comboBox_MCU.currentIndexChanged.connect(self.assign_command)
 
@@ -842,6 +887,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.comboBoxPython.currentIndexChanged.connect(self.assign_py_command_to_setting)
 
         self.actionconnect.triggered.connect(self.reconnect_gamepad)
+        self.actionCOM_Port_ASSIST.triggered.connect(self.message_show_available_com_port)
 
     def assign_fps_to_setting(self):
         self.setting.setting["main_window"]["must"]["fps"] = self.lineEditFPS.text()
@@ -917,6 +963,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.mcu_loader = CommandLoader(ospath("Commands/MCU"), McuCommand)
         self.py_classes = self.py_loader.load()
         self.mcu_classes = self.mcu_loader.load()
+        # print(self.mcu_classes)
         self.set_command_items()
         self.assign_command()
 
@@ -943,6 +990,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # 表示しているタブを読み取って、どのコマンドを表示しているか取得、リロード後もそれが選択されるようにする
         oldval_mcu = self.comboBox_MCU.itemText(self.comboBox_MCU.currentIndex())
         oldval_py = self.comboBoxPython.itemText(self.comboBoxPython.currentIndex())
+        print(oldval_mcu)
 
         self.comboBox_MCU.clear()
         self.comboBoxPython.clear()
@@ -976,6 +1024,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             pass
         pass
 
+    def show_serial(self):
+        if self.actionShow_Serial.isChecked():
+            self.setting.setting["main_window"]["option"]["show_serial"] = True
+            self.ser.is_show_serial = True
+        else:
+            self.setting.setting["main_window"]["option"]["show_serial"] = False
+            self.ser.is_show_serial = False
+        pass
+
     def capture_mousePressEvent(self, event):
         if event.modifiers() & QtCore.Qt.ControlModifier:  # Ctrlキーが押されているなら
             w = self.CaptureImageArea.width()
@@ -991,7 +1048,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return x, y, c_rgb
 
     def open_screen_shot_dir(self):
-        pass
+        os.startfile(os.path.realpath(self.cur_command.CAPTURE_DIR))
+
+    def open_python_shot_dir(self):
+        os.startfile(os.path.realpath(Path(self.cur_command.__directory__).resolve().parent))
+
+    def open_mcu_shot_dir(self):
+        os.startfile(os.path.realpath(self.cur_command.__directory__))
 
     def start_command(self):
         self.GamepadController_worker.pause = True
@@ -1011,6 +1074,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.worker.serial_input.connect(self.callback_keypress, type=Qt.DirectConnection)
         self.worker.get_image.connect(self.callback_return_img, type=Qt.DirectConnection)
+        self.worker.recognize_rect.connect(self.callback_show_recognize_rect, type=Qt.DirectConnection)
         self.capture_worker.send_img.connect(self.worker.callback_receive_img, type=Qt.DirectConnection)
 
         self.thread_2.started.connect(self.worker.run)
@@ -1038,19 +1102,39 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             # スレッドが作成されていて、削除されていない
             if self.thread_2.isRunning() or not self.thread_2.isFinished():
                 # self.worker.get_image.disconnect()
-                print("thread is stopping")
+                # print("thread is stopping")
                 self.worker.stop()
                 self.thread_2.quit()
                 self.thread_2.wait()
-                print("thread is stopped")
+                # print("thread is stopped")
                 self.worker = None
                 self.thread_2 = None
                 try:
                     self.GamepadController_worker.is_alive = True
                     self.GamepadController_worker.pause = False
                 except:
-                    print("ERROR")
+                    self.logger.error("ERROR")
                 # self.callback_stop_command()
+
+    def start_mcu_command(self):
+        self.assign_command()
+        self.pushButton_MCUStart.setEnabled(False)
+        self.pushButton_MCUStop.setEnabled(True)
+        self._mcu_command = self.cur_command()
+        self._mcu_command.play_sync_name.connect(self.play_mcu)
+        self._mcu_command.start()
+        pass
+
+    def stop_mcu_command(self):
+        self._mcu_command.end()
+        self._mcu_command.play_sync_name.disconnect()
+        self._mcu_command = None
+        self.pushButton_MCUStart.setEnabled(True)
+        self.pushButton_MCUStop.setEnabled(False)
+
+    def play_mcu(self, s):
+        self.ser.writeRow(s)
+        pass
 
     @Slot(str, type(logging.DEBUG))
     def callback_string_to_log(self, s, level) -> None:
@@ -1080,11 +1164,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         pass
 
     @Slot(type(Button.A), float, float)
-    def callback_keypress(self, buttons, duration, wait):
-        self.keyPress.input(buttons)
-        self.wait(duration)
-        self.keyPress.inputEnd(buttons)
-        self.wait(wait)
+    def callback_keypress(self, buttons, duration: float = 0.1, wait: float = 0.1, input_type: str = None):
+        if self.keyPress is not None:
+            match input_type:
+                case "press":
+                    self.keyPress.input(buttons)
+                    self.wait(duration)
+                    self.keyPress.inputEnd(buttons)
+                    self.wait(wait)
+                case "hold":
+                    self.keyPress.hold(buttons)
+                    self.wait(duration)
+                case "hold end":
+                    self.keyPress.holdEnd(buttons)
+                case _:
+                    self.logger.error("Something seems to have gone wrong.\nPlease send info to the developer.")
 
     @staticmethod
     def wait(wait):
@@ -1112,30 +1206,57 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.lineEditFPS.setText(str(self.setting.setting["main_window"]["must"]["fps"]))
         self.lineEditCameraID.setText(str(self.setting.setting["main_window"]["must"]["camera_id"]))
         self.lineEditComPort.setText(str(self.setting.setting["main_window"]["must"]["com_port"]))
+        self.actionShow_Serial.setChecked(self.setting.setting["main_window"]["option"]["show_serial"])
 
         self.keymap = {
-            v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["button"].items() if v["state"]
-        } | {v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["hat"].items() if v["state"]}
+                          v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["button"].items() if
+                          v["state"]
+                      } | {v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["hat"].items() if
+                           v["state"]}
 
     def closeEvent(self, event: PySide6.QtGui.QCloseEvent) -> None:
+        # Windowが最大化されていたら記憶する
+        if self.isMaximized():
+            self.setting.setting["main_window"]["option"]["window_showMaximized"] = True
+        else:
+            self.setting.setting["main_window"]["option"]["window_showMaximized"] = False
+        self.setting.setting["command"]["py_command"] = self.comboBoxPython.currentText()
+        self.setting.setting["command"]["mcu_command"] = self.comboBox_MCU.currentText()
+
         self.setting.save()
         try:
-            self.thread_1.terminate()
-            self.thread_2.terminate()
+            if self.thread_1 is not None:
+                self.thread_1.terminate()
+            if self.thread_2 is not None:
+                self.thread_2.terminate()
             # self.GamepadController_worker.p.terminate()
             # self.GamepadController_worker.p.join()
         except Exception:
             pass
         try:
-            self.GamepadController_worker.p.terminate()
-            self.GamepadController_worker.p.join()
-            self.GamepadController_thread.terminate()
+            if self.GamepadController_worker is not None:
+                self.GamepadController_worker.p.terminate()
+                self.GamepadController_worker.p.join()
+            if self.GamepadController_thread is not None:
+                self.GamepadController_thread.terminate()
         except Exception as e:
-            print(000, e)
+            # print(000, e)
             pass
 
         self.logger.debug("Save settings")
         return super().closeEvent(event)
+
+    def callback_show_recognize_rect(self, t1: tuple, t2: tuple, color: QColor, frames: int = 120):
+        if self.capture_worker is not None:
+            self.capture_worker.rect_list.append([t1[0], t1[1], t2[0], t2[1], color, frames])
+
+    @staticmethod
+    def message_show_available_com_port():
+        ls = serial_ports()
+        ret = QMessageBox.information(None,
+                                      "利用可能なCOMポート",
+                                      f"利用可能なCOMポートは\n{','.join(ls)}\nです。",
+                                      QMessageBox.Ok)
 
 
 if __name__ == "__main__":

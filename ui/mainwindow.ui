@@ -603,6 +603,12 @@
     <addaction name="actionQuit"/>
    </widget>
    <widget class="QMenu" name="menuOption">
+    <property name="sizePolicy">
+     <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
+      <horstretch>0</horstretch>
+      <verstretch>0</verstretch>
+     </sizepolicy>
+    </property>
     <property name="title">
      <string>Option</string>
     </property>
@@ -611,9 +617,8 @@
     <addaction name="actionShow_Serial"/>
     <addaction name="separator"/>
     <addaction name="actionKeyboard_Control"/>
-    <addaction name="actionL_Stick_Control"/>
-    <addaction name="actionR_Stick_Control"/>
     <addaction name="separator"/>
+    <addaction name="actionCOM_Port_ASSIST"/>
    </widget>
    <widget class="QMenu" name="menuGUI_Controller">
     <property name="title">
@@ -1956,6 +1961,9 @@
    <property name="checked">
     <bool>false</bool>
    </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="text">
     <string>L Stick Control</string>
    </property>
@@ -1968,6 +1976,9 @@
   <action name="actionR_Stick_Control">
    <property name="checkable">
     <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
    </property>
    <property name="text">
     <string>R Stick Control</string>
@@ -1982,8 +1993,11 @@
    <property name="checkable">
     <bool>true</bool>
    </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="text">
-    <string>Keyboard Control</string>
+    <string>Keyboard Control(実装未定)</string>
    </property>
    <property name="font">
     <font>
@@ -2002,8 +2016,11 @@
    </property>
   </action>
   <action name="actionGuiSetting">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="text">
-    <string>設定</string>
+    <string>設定(実装未定)</string>
    </property>
    <property name="font">
     <font>
@@ -2040,6 +2057,9 @@
    <property name="checkable">
     <bool>true</bool>
    </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="text">
     <string>Show Camera Realtime</string>
    </property>
@@ -2055,8 +2075,16 @@
    </property>
   </action>
   <action name="actionsetting">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="text">
-    <string>設定</string>
+    <string>設定(実装中)</string>
+   </property>
+  </action>
+  <action name="actionCOM_Port_ASSIST">
+   <property name="text">
+    <string>利用可能なCOM Port取得</string>
    </property>
   </action>
  </widget>
@@ -2160,6 +2188,22 @@
     </hint>
    </hints>
   </connection>
+  <connection>
+   <sender>actionShow_Serial</sender>
+   <signal>triggered(bool)</signal>
+   <receiver>MainWindow</receiver>
+   <slot>show_serial()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>517</x>
+     <y>398</y>
+    </hint>
+   </hints>
+  </connection>
  </connections>
  <slots>
   <slot>reloadCamera()</slot>
@@ -2170,5 +2214,6 @@
   <slot>stopCommand()</slot>
   <slot>openPythonCommandsDir()</slot>
   <slot>openMCUCommandsDir()</slot>
+  <slot>show_serial()</slot>
  </slots>
 </ui>
