@@ -1,0 +1,133 @@
+[main_window]
+show_camera_realtime = false
+show_serial = false
+keyboard_control = false
+tab = "python"
+
+[line]
+token_1 = "ここにLINE通知用のtokenを貼付(機能未実装)"
+
+[command]
+py_command = "A連打"
+mcu_command = ""
+
+[main_window.must]
+fps = "60"
+com_port = "1"
+com_port_name = ""
+camera_id = "0"
+camera_name = ""
+
+[main_window.option]
+window_size_width = 948
+window_size_height = 796
+window_showMaximized = false
+show_serial = false
+
+[key_config.keyboard.button]
+Y = "K_y"
+B = "K_b"
+A = "K_a"
+X = "K_x"
+L = "K_l"
+R = "K_r"
+ZL = "K_k"
+ZR = "K_e"
+MINUS = "K_m"
+PLUS = "K_p"
+LCLICK = "K_q"
+RCLICK = "K_w"
+HOME = "K_h"
+CAPTURE = "K_c"
+
+[key_config.keyboard.direction]
+UP = "K_UP"
+RIGHT = "K_RIGHT"
+DOWN = "K_DOWN"
+LEFT = "K_LEFT"
+UP_RIGHT = ""
+DOWN_RIGHT = ""
+DOWN_LEFT = ""
+UP_LEFT = ""
+
+[key_config.keyboard.hat]
+TOP = ""
+BTM = ""
+LEFT = ""
+RIGHT = ""
+
+[key_config.joystick.direction]
+LStick = true
+RStick = true
+
+[key_config.joystick.button.Y]
+state = true
+assign = "button.3"
+
+[key_config.joystick.button.B]
+state = true
+assign = "button.1"
+
+[key_config.joystick.button.A]
+state = true
+assign = "button.0"
+
+[key_config.joystick.button.X]
+state = true
+assign = "button.2"
+
+[key_config.joystick.button.L]
+state = true
+assign = "button.9"
+
+[key_config.joystick.button.R]
+state = true
+assign = "button.10"
+
+[key_config.joystick.button.ZL]
+state = true
+assign = "axis.4"
+
+[key_config.joystick.button.ZR]
+state = true
+assign = "axis.5"
+
+[key_config.joystick.button.MINUS]
+state = true
+assign = "button.4"
+
+[key_config.joystick.button.PLUS]
+state = true
+assign = "button.6"
+
+[key_config.joystick.button.LCLICK]
+state = true
+assign = "button.7"
+
+[key_config.joystick.button.RCLICK]
+state = true
+assign = "button.8"
+
+[key_config.joystick.button.HOME]
+state = true
+assign = "button.5"
+
+[key_config.joystick.button.CAPTURE]
+state = true
+assign = "button.15"
+
+[key_config.joystick.hat.TOP]
+state = true
+assign = "button.11"
+
+[key_config.joystick.hat.BTM]
+state = true
+assign = "button.12"
+
+[key_config.joystick.hat.LEFT]
+state = true
+assign = "button.13"
+
+[key_config.joystick.hat.RIGHT]
+state = true
+assign = "button.14"

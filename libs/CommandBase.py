@@ -36,6 +36,7 @@ class CommandBase(QObject):
     CAPTURE_DIR = "./ScreenShot"
     TEMPLATE_PATH = "./template/"
     __directory__ = "./Commands/Python"
+    __tool_tip__ = None
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -161,7 +162,10 @@ class CommandBase(QObject):
         top_lefts = []
         bottom_rights = []
         for i in range(box_n := len(boxes)):
-            top_lefts.append((boxes[i][0]+trim[0], boxes[i][1]+trim[1]))
+            if trim is not None:
+                top_lefts.append((boxes[i][0] + trim[0], boxes[i][1] + trim[1]))
+            else:
+                top_lefts.append((boxes[i][0], boxes[i][1]))
             # bottom_rights.append((boxes[i][2], boxes[i][3]))
         tag = str(time.perf_counter()) + str(random.random())
         if max_val >= threshold:
