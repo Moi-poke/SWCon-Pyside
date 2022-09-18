@@ -11,7 +11,7 @@
 - mainwindow.pyを起動
 
 
-# feature
+# Feature
 
 Poke-Controllerからの変更点は下記
 - GUI Controller を据え置き型で設置(消すことも再表示することも可能)
