@@ -31,7 +31,7 @@ from libs.Utility import ospath
 from ui.main_ui import Ui_MainWindow
 from ui.QtextLogger import QPlainTextEditLogger
 
-VERSION = "0.4.0 (beta)"
+VERSION = "0.5.0 (beta)"
 Author = "Moi"
 
 
@@ -251,7 +251,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.GamepadController_worker.connect_joystick()
         pass
 
-    def BTN_click(self, event):
+    def BTN_click(self, event=None):
         btn = self.sender().objectName()[4:]
         match btn:
             case "zl":
@@ -347,7 +347,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def press_zl(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
                 joystick = True
             else:
                 joystick = False
@@ -360,7 +360,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def press_l(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
                 joystick = True
             else:
                 joystick = False
@@ -372,7 +372,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def press_lclick(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
                 joystick = True
             else:
                 joystick = False
@@ -384,7 +384,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def press_minus(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
                 joystick = True
             else:
                 joystick = False
@@ -396,7 +396,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def press_top(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
                 joystick = True
             else:
                 joystick = False
@@ -408,7 +408,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def press_btm(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
                 joystick = True
             else:
                 joystick = False
@@ -420,7 +420,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def press_left(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
                 joystick = True
             else:
                 joystick = False
@@ -432,7 +432,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def press_right(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
                 joystick = True
             else:
                 joystick = False
@@ -444,7 +444,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def press_capture(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
                 joystick = True
             else:
                 joystick = False
@@ -456,7 +456,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def press_zr(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
                 joystick = True
             else:
                 joystick = False
@@ -468,7 +468,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def press_r(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
                 joystick = True
             else:
                 joystick = False
@@ -480,7 +480,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def press_rclick(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
                 joystick = True
             else:
                 joystick = False
@@ -492,7 +492,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def press_plus(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
                 joystick = True
             else:
                 joystick = False
@@ -504,7 +504,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def press_a(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
                 joystick = True
             else:
                 joystick = False
@@ -516,7 +516,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def press_b(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
                 joystick = True
             else:
                 joystick = False
@@ -528,7 +528,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def press_x(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
                 joystick = True
             else:
                 joystick = False
@@ -540,7 +540,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def press_y(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
                 joystick = True
             else:
                 joystick = False
@@ -552,7 +552,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def press_home(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
                 joystick = True
             else:
                 joystick = False
@@ -564,7 +564,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def release_zl(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
+                joystick = True
+            elif isinstance(self.sender(), QtWidgets.QPushButton):
                 joystick = True
             else:
                 joystick = False
@@ -576,7 +578,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def release_l(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
+                joystick = True
+            elif isinstance(self.sender(), QtWidgets.QPushButton):
                 joystick = True
             else:
                 joystick = False
@@ -588,7 +592,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def release_lclick(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
+                joystick = True
+            elif isinstance(self.sender(), QtWidgets.QPushButton):
                 joystick = True
             else:
                 joystick = False
@@ -600,7 +606,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def release_minus(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
+                joystick = True
+            elif isinstance(self.sender(), QtWidgets.QPushButton):
                 joystick = True
             else:
                 joystick = False
@@ -612,7 +620,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def release_top(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
+                joystick = True
+            elif isinstance(self.sender(), QtWidgets.QPushButton):
                 joystick = True
             else:
                 joystick = False
@@ -624,7 +634,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def release_btm(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
+                joystick = True
+            elif isinstance(self.sender(), QtWidgets.QPushButton):
                 joystick = True
             else:
                 joystick = False
@@ -636,7 +648,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def release_left(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
+                joystick = True
+            elif isinstance(self.sender(), QtWidgets.QPushButton):
                 joystick = True
             else:
                 joystick = False
@@ -648,7 +662,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def release_right(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
+                joystick = True
+            elif isinstance(self.sender(), QtWidgets.QPushButton):
                 joystick = True
             else:
                 joystick = False
@@ -660,7 +676,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def release_capture(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
+                joystick = True
+            elif isinstance(self.sender(), QtWidgets.QPushButton):
                 joystick = True
             else:
                 joystick = False
@@ -672,7 +690,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def release_zr(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
+                joystick = True
+            elif isinstance(self.sender(), QtWidgets.QPushButton):
                 joystick = True
             else:
                 joystick = False
@@ -684,7 +704,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def release_r(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
+                joystick = True
+            elif isinstance(self.sender(), QtWidgets.QPushButton):
                 joystick = True
             else:
                 joystick = False
@@ -696,7 +718,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def release_rclick(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
+                joystick = True
+            elif isinstance(self.sender(), QtWidgets.QPushButton):
                 joystick = True
             else:
                 joystick = False
@@ -708,7 +732,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def release_plus(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
+                joystick = True
+            elif isinstance(self.sender(), QtWidgets.QPushButton):
                 joystick = True
             else:
                 joystick = False
@@ -720,7 +746,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def release_a(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
+                joystick = True
+            elif isinstance(self.sender(), QtWidgets.QPushButton):
                 joystick = True
             else:
                 joystick = False
@@ -732,7 +760,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def release_b(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
+                joystick = True
+            elif isinstance(self.sender(), QtWidgets.QPushButton):
                 joystick = True
             else:
                 joystick = False
@@ -744,7 +774,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def release_x(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
+                joystick = True
+            elif isinstance(self.sender(), QtWidgets.QPushButton):
                 joystick = True
             else:
                 joystick = False
@@ -756,7 +788,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def release_y(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
+                joystick = True
+            elif isinstance(self.sender(), QtWidgets.QPushButton):
                 joystick = True
             else:
                 joystick = False
@@ -768,7 +802,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def release_home(self):
         try:
-            if type(self.sender()) == type(self.GamepadController_worker):
+            if isinstance(self.sender(), type(self.GamepadController_worker)):
+                joystick = True
+            elif isinstance(self.sender(), QtWidgets.QPushButton):
                 joystick = True
             else:
                 joystick = False
@@ -832,24 +868,62 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def setup_functions_connect(self):
 
         # controllerボタンの割当
-        self.BTN_zl.clicked.connect(self.BTN_click)
-        self.BTN_l.clicked.connect(self.BTN_click)
-        self.BTN_up.clicked.connect(self.BTN_click)
-        self.BTN_down.clicked.connect(self.BTN_click)
-        self.BTN_left.clicked.connect(self.BTN_click)
-        self.BTN_right.clicked.connect(self.BTN_click)
-        self.BTN_capture.clicked.connect(self.BTN_click)
-        self.BTN_ls.clicked.connect(self.BTN_click)
-        self.BTN_minus.clicked.connect(self.BTN_click)
-        self.BTN_zr.clicked.connect(self.BTN_click)
-        self.BTN_r.clicked.connect(self.BTN_click)
-        self.BTN_plus.clicked.connect(self.BTN_click)
-        self.BTN_rs.clicked.connect(self.BTN_click)
-        self.BTN_a.clicked.connect(self.BTN_click)
-        self.BTN_b.clicked.connect(self.BTN_click)
-        self.BTN_x.clicked.connect(self.BTN_click)
-        self.BTN_y.clicked.connect(self.BTN_click)
-        self.BTN_home.clicked.connect(self.BTN_click)
+        self.BTN_zl.pressed.connect(self.press_zl)
+        self.BTN_l.pressed.connect(self.press_l)
+        self.BTN_ls.pressed.connect(self.press_lclick)
+        self.BTN_minus.pressed.connect(self.press_minus)
+        self.BTN_up.pressed.connect(self.press_top)
+        self.BTN_down.pressed.connect(self.press_btm)
+        self.BTN_left.pressed.connect(self.press_left)
+        self.BTN_right.pressed.connect(self.press_right)
+        self.BTN_capture.pressed.connect(self.press_capture)
+        self.BTN_zr.pressed.connect(self.press_zr)
+        self.BTN_r.pressed.connect(self.press_r)
+        self.BTN_rs.pressed.connect(self.press_rclick)
+        self.BTN_plus.pressed.connect(self.press_plus)
+        self.BTN_a.pressed.connect(self.press_a)
+        self.BTN_b.pressed.connect(self.press_b)
+        self.BTN_x.pressed.connect(self.press_x)
+        self.BTN_y.pressed.connect(self.press_y)
+        self.BTN_home.pressed.connect(self.press_home)
+
+        self.BTN_zl.released.connect(self.release_zl)
+        self.BTN_l.released.connect(self.release_l)
+        self.BTN_ls.released.connect(self.release_lclick)
+        self.BTN_minus.released.connect(self.release_minus)
+        self.BTN_up.released.connect(self.release_top)
+        self.BTN_down.released.connect(self.release_btm)
+        self.BTN_left.released.connect(self.release_left)
+        self.BTN_right.released.connect(self.release_right)
+        self.BTN_capture.released.connect(self.release_capture)
+        self.BTN_zr.released.connect(self.release_zr)
+        self.BTN_r.released.connect(self.release_r)
+        self.BTN_rs.released.connect(self.release_rclick)
+        self.BTN_plus.released.connect(self.release_plus)
+        self.BTN_a.released.connect(self.release_a)
+        self.BTN_b.released.connect(self.release_b)
+        self.BTN_x.released.connect(self.release_x)
+        self.BTN_y.released.connect(self.release_y)
+        self.BTN_home.released.connect(self.release_home)
+
+        # self.BTN_zl.released.connect(self.release_zl)
+        # self.BTN_l.released.connect(self.release_l)
+        # self.BTN_up.released.connect(self.release_lclick)
+        # self.BTN_down.released.connect(self.release_minus)
+        # self.BTN_left.released.connect(self.release_top)
+        # self.BTN_right.released.connect(self.release_btm)
+        # self.BTN_capture.released.connect(self.release_left)
+        # self.BTN_ls.released.connect(self.release_right)
+        # self.BTN_minus.released.connect(self.release_capture)
+        # self.BTN_zr.released.connect(self.release_zr)
+        # self.BTN_r.released.connect(self.release_r)
+        # self.BTN_plus.released.connect(self.release_rclick)
+        # self.BTN_rs.released.connect(self.release_plus)
+        # self.BTN_a.released.connect(self.release_a)
+        # self.BTN_b.released.connect(self.release_b)
+        # self.BTN_x.released.connect(self.release_x)
+        # self.BTN_y.released.connect(self.release_y)
+        # self.BTN_home.released.connect(self.release_home)
 
         # 各ボタンの関数割当
         self.pushButton_PythonStart.pressed.connect(self.start_command)
@@ -939,19 +1013,22 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.capture_worker.open_camera(int(cam_id))
 
     def activate_serial(self):
-        if self.ser.isOpened():
-            print("Port is already opened and being closed.")
-            self.ser.closeSerial()
-            self.keyPress = None
-            self.activate_serial()
-        else:
-            if self.ser.openSerial(self.setting.setting["main_window"]["must"]["com_port"], ""):
-                self.logger.debug(
-                    "COM Port "
-                    + str(self.setting.setting["main_window"]["must"]["com_port"])
-                    + " connected successfully"
-                )
-                self.keyPress = KeyPress(self.ser)
+        try:
+            if self.ser.isOpened():
+                print("Port is already opened and being closed.")
+                self.ser.closeSerial()
+                self.keyPress = None
+                self.activate_serial()
+            else:
+                if self.ser.openSerial(self.setting.setting["main_window"]["must"]["com_port"], ""):
+                    self.logger.debug(
+                        "COM Port "
+                        + str(self.setting.setting["main_window"]["must"]["com_port"])
+                        + " connected successfully"
+                    )
+                    self.keyPress = KeyPress(self.ser)
+        except:
+            self.logger.debug("Input Correct COM Port and Reload!")
         pass
 
     # Todo キーボード操作できるようにする
@@ -968,8 +1045,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.assign_command()
 
     def set_command_items(self):
+        i = 0
         for v in [c.NAME for c in self.py_classes]:
             self.comboBoxPython.addItem(v)
+            if (s := self.py_classes[i]().__tool_tip__) is not None:
+                self.comboBoxPython.setItemData(i, s, QtCore.Qt.ToolTipRole)
+            i += 1
+        s = None
         self.comboBoxPython.setCurrentIndex(0)
         for v in [c.NAME for c in self.mcu_classes]:
             self.comboBox_MCU.addItem(v)

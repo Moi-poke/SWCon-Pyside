@@ -5,7 +5,7 @@ keyboard_control = false
 tab = "python"
 
 [line]
-token_1 = "ここにLINE通知用のtokenを貼付"
+token_1 = "ここにLINE通知用のtokenを貼付(機能未実装)"
 
 [command]
 py_command = "A連打"
@@ -13,14 +13,16 @@ mcu_command = ""
 
 [main_window.must]
 fps = "60"
-com_port = 3
+com_port = "1"
 com_port_name = ""
-camera_id = "6"
+camera_id = "0"
 camera_name = ""
 
 [main_window.option]
 window_size_width = 948
 window_size_height = 796
+window_showMaximized = false
+show_serial = false
 
 [key_config.keyboard.button]
 Y = "K_y"

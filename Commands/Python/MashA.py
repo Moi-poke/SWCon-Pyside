@@ -10,6 +10,7 @@ from libs.keys import Button
 class Mash_A(CommandBase):
     NAME = "A連打"
     CAPTURE_DIR = "./Screenshot"
+    __tool_tip__ = "Aを無限回連打します。"
 
     def __init__(self):
         super().__init__()
