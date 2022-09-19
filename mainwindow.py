@@ -31,7 +31,7 @@ from libs.Utility import ospath
 from ui.main_ui import Ui_MainWindow
 from ui.QtextLogger import QPlainTextEditLogger
 
-VERSION = "0.5.0 (beta)"
+VERSION = "0.6.0 (beta)"
 Author = "Moi"
 
 
@@ -1311,12 +1311,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.thread_1.terminate()
             if self.thread_2 is not None:
                 self.thread_2.terminate()
-            # self.GamepadController_worker.p.terminate()
-            # self.GamepadController_worker.p.join()
+            self.GamepadController_worker.p.terminate()
+            self.GamepadController_worker.p.join()
         except Exception:
             pass
         try:
             if self.GamepadController_worker is not None:
+                self.GamepadController_worker.stop()
                 self.GamepadController_worker.p.terminate()
                 self.GamepadController_worker.p.join()
             if self.GamepadController_thread is not None:
@@ -1326,6 +1327,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             pass
 
         self.logger.debug("Save settings")
+        print("Save settings")
         return super().closeEvent(event)
 
     def callback_show_recognize_rect(self, t1: tuple, t2: tuple, color: QColor, frames: int = 120):
@@ -1360,8 +1362,9 @@ if __name__ == "__main__":
         app.setStyleSheet(style)
         window = MainWindow()
         window.show()
+        sys.exit(app.exec())
     except Exception as e:
         # app = None
         logger.exception(e)
 
-    sys.exit(app.exec())
+    print("quit")
