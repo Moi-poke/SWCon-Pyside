@@ -18,7 +18,11 @@ from PySide6 import QtCore, QtGui, QtSerialPort, QtWidgets
 from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QPushButton
 
-from libs.settings import Setting
+try:
+    from libs.settings import Setting
+except:
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+    from libs.settings import Setting
 from ui.key_config import Ui_Form
 
 
@@ -162,8 +166,10 @@ class SettingWindow(QtWidgets.QWidget, Ui_Form):
         self.setWindowTitle(self.joystick.get_name())
         self.hat_prev = 0
         self.keymap = {
-            v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["button"].items() if v["state"]
-        } | {v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["hat"].items() if v["state"]}
+                          v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["button"].items() if
+                          v["state"]
+                      } | {v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["hat"].items() if
+                           v["state"]}
         # print(self.keymap)
 
         self.Controller_worker = GamepadController()
@@ -302,8 +308,10 @@ class SettingWindow(QtWidgets.QWidget, Ui_Form):
 
     def remap_key(self):
         self.keymap = {
-            v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["button"].items() if v["state"]
-        } | {v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["hat"].items() if v["state"]}
+                          v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["button"].items() if
+                          v["state"]
+                      } | {v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["hat"].items() if
+                           v["state"]}
         try:
             self.Controller_worker.set_keymap(self.keymap)
         except Exception as e:
@@ -579,7 +587,6 @@ class GamepadController(QObject):
 
     AXIS_MOVED = QtCore.Signal(float, float, float, float)
 
-    
     print_strings = QtCore.Signal(str, type(logging.DEBUG))
 
     def __init__(self):
@@ -596,7 +603,7 @@ class GamepadController(QObject):
         self.keymap = {}
         self.pause = False
         self.p = None
-        self.isCanceled= False
+        self.isCanceled = False
         pygame.init()
         self.connect_joystick()
 
@@ -618,7 +625,7 @@ class GamepadController(QObject):
             self.no_joystick = False
             self.reconnect_subprocess()
             return True
-        except:            
+        except:
             self.no_joystick = True
             self.debug("No joystick")
             return False
@@ -885,6 +892,7 @@ class GamepadController(QObject):
             time.sleep(max(1 / 60 - (time.perf_counter() - start), 0.0001))
 
         print("DEAD")
+        self.p.close()
         self.p.kill()
 
     def check(self):
@@ -892,9 +900,12 @@ class GamepadController(QObject):
 
     def stop(self):
         self.is_alive = False
+        self.p.close()
+        print("close")
         self.p.kill()
 
-    
+        print("kill")
+
     # ログをメインに飛ばすため
     def debug(self, s, force=False):
         if force or not self.isCanceled:
@@ -937,13 +948,16 @@ def j_stick():
     stick_shm = shared_memory.SharedMemory(name="stick")  # 共有メモリを取得
     stick = np.ndarray((4, 1), dtype=np.float64, buffer=stick_shm.buf)
 
-    while True:
-        for e in pygame.event.get():
-            if e.type == pygame.locals.JOYAXISMOTION:
-                stick[0] = joystick.get_axis(0)  # left horizontal
-                stick[1] = joystick.get_axis(1)  # left vertical
-                stick[2] = joystick.get_axis(2)  # right horizontal
-                stick[3] = joystick.get_axis(3)  # right vertical
+    try:
+        while True:
+            for e in pygame.event.get():
+                if e.type == pygame.locals.JOYAXISMOTION:
+                    stick[0] = joystick.get_axis(0)  # left horizontal
+                    stick[1] = joystick.get_axis(1)  # left vertical
+                    stick[2] = joystick.get_axis(2)  # right horizontal
+                    stick[3] = joystick.get_axis(3)  # right vertical
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__ == "__main__":
