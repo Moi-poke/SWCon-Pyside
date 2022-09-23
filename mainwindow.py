@@ -828,15 +828,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             right_r = 0
 
         # print(left_angle, left_r)
-
-        if self.gui_l_stick == 0 and self.gui_r_stick == 0:
-            self.keyPress.input(
-                [Direction(Stick.LEFT, left_angle, left_r), Direction(Stick.RIGHT, right_angle, right_r)]
-            )
-        elif self.gui_l_stick > 0 and self.gui_r_stick == 0:
-            self.keyPress.input([Direction(Stick.RIGHT, right_angle, right_r)])
-        elif self.gui_l_stick == 0 and self.gui_r_stick > 0:
-            self.keyPress.input([Direction(Stick.LEFT, left_angle, left_r)])
+        if self.keyPress is not None:
+            if self.gui_l_stick == 0 and self.gui_r_stick == 0:
+                self.keyPress.input(
+                    [Direction(Stick.LEFT, left_angle, left_r), Direction(Stick.RIGHT, right_angle, right_r)]
+                )
+            elif self.gui_l_stick > 0 and self.gui_r_stick == 0:
+                self.keyPress.input([Direction(Stick.RIGHT, right_angle, right_r)])
+            elif self.gui_l_stick == 0 and self.gui_r_stick > 0:
+                self.keyPress.input([Direction(Stick.LEFT, left_angle, left_r)])
 
     def gamepad_l_stick(self):
         if self.setting.setting["key_config"]["joystick"]["direction"]["LStick"]:
