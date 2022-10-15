@@ -10,6 +10,7 @@ class Test(CommandBase):
 
     def do(self):
         # print(self.is_contain_template("a.png"))
+        self.screenshot()
         for i in range(30):
             self.press(Button.A, duration=0.025, wait=0.025)
             self.debug("A")

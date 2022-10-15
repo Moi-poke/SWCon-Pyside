@@ -8,7 +8,7 @@ from libs.keys import Button, Hat
 
 class TableTurfAutoLose(CommandBase):
     NAME = "ナワバトラー自動敗北"
-    CAPTURE_DIR = "./Screenshot"
+    CAPTURE_DIR = "./Screenshot/turf_war_loser/"
     TEMPLATE_PATH = "./template/turf_war_loser/"
     __tool_tip__ = "ナワバトラーを自動で負け続けます。" \
                    "対戦相手を選択後、デッキ選択画面で実行してください。"

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import datetime
 import logging
 import math
 import os
@@ -12,7 +13,6 @@ from PySide6.QtCore import QObject, QSize, Qt, QThread, Signal, Slot
 
 
 class Sender(QObject):
-
     print_strings = Signal(str, type(logging.DEBUG))
 
     def __init__(self, is_show_serial, if_print=True):
@@ -26,6 +26,7 @@ class Sender(QObject):
         self._logger.setLevel(DEBUG)
         self._logger.propagate = True
 
+        self.f = None
         self.before = None
         self.L_holding = False
         self._L_holding = None
@@ -56,6 +57,8 @@ class Sender(QObject):
 
     def openSerial(self, portNum: int, portName: str = ""):
         try:
+
+            self.f = open(f"./macro/{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.log", "w")
             if portName is None or portName == "":
                 if os.name == "nt":
                     # print("connecting to " + "COM" + str(portNum))
@@ -91,6 +94,7 @@ class Sender(QObject):
     def closeSerial(self):
         self._logger.debug("Closing the serial communication")
         self.ser.close()
+        self.f.close()
 
     def isOpened(self):
         self._logger.debug("Checking if serial communication is open")
@@ -109,6 +113,10 @@ class Sender(QObject):
             if self.is_show_serial and row != "0x0000 8" and row != self.before:
                 # print(row)
                 self.debug(row)
+
+            if row != self.before:
+                self.f.write(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')},{row}\n")
+
             self.before = row
         except serial.serialutil.SerialException as e:
             # print(e)
