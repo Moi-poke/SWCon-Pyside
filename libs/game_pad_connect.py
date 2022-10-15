@@ -541,6 +541,7 @@ class SettingWindow(QtWidgets.QWidget, Ui_Form):
 
     def closeEvent(self, a0: QtGui.QCloseEvent) -> None:
         self.setting.save()
+        self.Controller_worker.stop()
         self.Controller_worker.is_alive = False
         # self.Controller_thread.quit()
         return super().closeEvent(a0)
@@ -900,6 +901,7 @@ class GamepadController(QObject):
 
     def stop(self):
         self.is_alive = False
+        self.p.terminate()
         self.p.close()
         print("close")
         self.p.kill()

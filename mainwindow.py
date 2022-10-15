@@ -12,6 +12,7 @@ from typing import Optional
 
 import cv2
 import PySide6
+import numpy as np
 import shiboken6
 from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import QSize, Qt, QThread, Signal, Slot
@@ -30,8 +31,9 @@ from libs.settings import Setting
 from libs.Utility import ospath
 from ui.main_ui import Ui_MainWindow
 from ui.QtextLogger import QPlainTextEditLogger
+from libs.LineNotify import LineNotify
 
-VERSION = "0.6.0 (beta)"
+VERSION = "0.7.0 (beta)"
 Author = "Moi"
 
 
@@ -67,6 +69,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.keymap = None
         self.gui_l_stick = 0
         self.gui_r_stick = 0
+
+        self.bef_left_angle = None
+        self.bef_left_r = None
+        self.bef_right_angle = None
+        self.bef_right_r = None
 
         self.setting = Setting()
 
@@ -154,6 +161,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 )
         # self.pushButtonScreenShot.clicked.connect(self.test)
         # self.CaptureImageArea.mousePressEvent = self.capture_mousePressEvent
+        # print(self.setting.setting["line"])
+        self.line_notify = LineNotify(tokens=self.setting.setting["line"])
+        self.line_notify.print_strings.connect(self.callback_string_to_log)
+        # self.logger.debug(self.line_notify.send_text("test", token_key="token_3"))
 
     def test(self):
         self.BTN_a.toggle()
@@ -828,6 +839,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             right_r = 0
 
         # print(left_angle, left_r)
+        # if self.bef_left_r is None or (left_r != 0 and self.bef_left_r != left_r) or (
+        #         right_r != 0 and self.bef_right_r != right_r):
+        #     self.logger.debug(f"left:{left_angle:.2f}, {left_r:.2f}  right:{right_angle:.2f}, {right_r:.2f}")
         if self.keyPress is not None:
             if self.gui_l_stick == 0 and self.gui_r_stick == 0:
                 self.keyPress.input(
@@ -837,6 +851,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.keyPress.input([Direction(Stick.RIGHT, right_angle, right_r)])
             elif self.gui_l_stick == 0 and self.gui_r_stick > 0:
                 self.keyPress.input([Direction(Stick.LEFT, left_angle, left_r)])
+
+        self.bef_left_angle = left_angle
+        self.bef_left_r = left_r
+        self.bef_right_angle = right_angle
+        self.bef_right_r = right_r
 
     def gamepad_l_stick(self):
         if self.setting.setting["key_config"]["joystick"]["direction"]["LStick"]:
@@ -1009,6 +1028,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def img_recognition_return(self):
         return self.img
 
+    @Slot(str)
+    def callback_run_macro(self, s):
+        self.ser.writeRow(s)
+
     def reconnect_camera(self, cam_id):
         self.capture_worker.open_camera(int(cam_id))
 
@@ -1158,11 +1181,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.worker.get_image.connect(self.callback_return_img, type=Qt.DirectConnection)
         self.worker.recognize_rect.connect(self.callback_show_recognize_rect, type=Qt.DirectConnection)
         self.capture_worker.send_img.connect(self.worker.callback_receive_img, type=Qt.DirectConnection)
+        self.worker.line_txt.connect(self.callback_line_txt, type=Qt.DirectConnection)
+        self.worker.line_img.connect(self.callback_line_img, type=Qt.DirectConnection)
+        self.worker.send_serial.connect(self.callback_run_macro, type=Qt.DirectConnection)
 
         self.thread_2.started.connect(self.worker.run)
 
         self.thread_2.finished.connect(self.worker.deleteLater)
         self.thread_2.finished.connect(self.thread_2.deleteLater)
+        if self.worker is not None:
+            try:
+                self.worker.__post_init__()
+            except:
+                ...
         self.thread_2.start()
 
     @staticmethod
@@ -1233,6 +1264,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.logger.critical(s)
             case logging.FATAL:
                 self.logger.fatal(s)
+
+    @Slot(str, str)
+    def callback_line_txt(self, s, token_key) -> None:
+        self.line_notify.send_text(s, token_key=token_key)
+        ...
+
+    @Slot(str, str, np.ndarray)
+    def callback_line_img(self, s, token_key, img) -> None:
+        self.line_notify.send_text_n_image(img, s, token_key=token_key)
+        ...
 
     def callback_stop_command(self):
         self.pushButton_PythonStart.setEnabled(True)

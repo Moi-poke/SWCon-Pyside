@@ -6,6 +6,7 @@ import threading
 import time
 from abc import abstractmethod
 from datetime import datetime
+from typing import Optional
 
 import cv2
 import numpy
@@ -14,6 +15,7 @@ from PySide6.QtCore import QObject, Signal, Slot
 from PySide6.QtGui import QColor, QPainter
 
 from libs.keys import Button
+from concurrent.futures import ThreadPoolExecutor
 
 
 class StopSignal(Exception):
@@ -32,6 +34,9 @@ class CommandBase(QObject):
     stop_function = Signal(bool)
     get_image = Signal(bool)
     recognize_rect = Signal(tuple, tuple, QColor, int)
+    line_txt = Signal(str, str)
+    line_img = Signal(str, str, np.ndarray)
+    send_serial = Signal(str)
 
     CAPTURE_DIR = "./ScreenShot"
     TEMPLATE_PATH = "./template/"
@@ -45,12 +50,24 @@ class CommandBase(QObject):
         self.debug(f"コマンド実行Thread: {threading.get_ident()}")
         # print("init")
 
+    def __post_init__(self):
+        ...
+
     def run(self):
         # ここでdo()を行えばよいはず?
         try:
             self.do()
-        except StopSignal:
+        except StopSignal as e:
+            self.stop_function.emit(True)
             self.info("Command finished successfully")
+        # except ZeroDivisionError:
+        #     self.error(111, force=True)
+        except Exception as e:
+            self.error(e)
+            self.error("エラーが発生しました", force=True)
+            self.stop_function.emit(True)
+            # raise StopSignal
+            pass
         if self.isCanceled:
             self.debug("Command Stopped.", force=True)
         self.stop_function.emit(True)
@@ -68,6 +85,10 @@ class CommandBase(QObject):
         #         # self.thread_do.quit()
         #         # self.thread_do.wait()
         #         self.parent.pushButton_PythonStart.setEnabled(True)
+
+    def finish(self):
+        self.isCanceled = True
+        raise StopSignal
 
     def press(self, buttons, duration: float = 0.1, wait: float = 0.1):
         if not self.isCanceled:
@@ -115,6 +136,85 @@ class CommandBase(QObject):
         else:
             return True
 
+    def write_serial(self, s: str):
+        self.send_serial.emit(s)
+
+    def matching_image_in_the_template_listing(
+            self,
+            template_path_list: list[str],
+            threshold: float = 0.7,
+            use_gray: bool = False,
+            show_value: bool = False,
+            show_position: bool = False,
+            show_rect_frame: bool = False,
+            color: QColor = QColor(255, 0, 0, 127),
+            trim: Optional[list[int, int, int, int]] = None
+    ) -> dict:
+        """
+
+        Args:
+            template_path_list: テンプレートパス(str)のリスト
+            threshold:
+            use_gray:
+            show_value:
+            show_position:
+            show_rect_frame:
+            color:
+            trim: left_up_x, left_up_y, right_down_x, right_down_y
+
+        Returns:
+
+        """
+
+        def get_res(targets) -> dict:
+            _src = targets[0]
+            _path = targets[1]
+            _img = targets[2]
+            _method = cv2.TM_CCOEFF_NORMED
+
+            _res = cv2.matchTemplate(_src, _img, _method)
+            _, max_val, _, max_loc = cv2.minMaxLoc(_res)
+
+            w, h = _img.shape[1], _img.shape[0]
+
+            positions = np.where(_res >= threshold)
+            scores = _res[positions]
+            boxes = []
+            for y, x in zip(*positions):
+                boxes.append([x, y, x + w - 1, y + h - 1])
+            boxes = np.array(boxes)
+            # print(boxes)
+            boxes = self.non_max_suppression(boxes, scores, overlap_thresh=0.8)
+
+            return {_path: {"score": max_val, "position": boxes}}
+
+        self.get_image.emit(True)
+        src = cv2.cvtColor(self.src, cv2.COLOR_BGR2GRAY) if use_gray else self.src
+        if trim is not None:
+            src = src[trim[1]:trim[3], trim[0]:trim[2]]
+
+        results = []
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            res = executor.map(self.read_template, [[s, use_gray] for s in template_path_list], timeout=None)
+            for _ in res:
+                results.append(_)
+
+        args = [[src, i[0], i[1]] for i in results]
+        results = {}
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            res = executor.map(get_res, args)
+            for _ in res:
+                results |= _
+
+        return results
+
+    def read_template(self, *args) -> list:
+        # print(*args)
+        template_path: str = args[0][0]
+        use_gray: bool = args[0][1]
+        return [template_path,
+                cv2.imread(self.TEMPLATE_PATH + template_path, cv2.IMREAD_GRAYSCALE if use_gray else cv2.IMREAD_COLOR)]
+
     def is_contain_template(
             self,
             template_path: str,
@@ -124,9 +224,25 @@ class CommandBase(QObject):
             show_position: bool = True,
             show_only_true_rect: bool = True,
             show_rect_frame: int = 120,
-            trim: list[int, int, int, int] = None,
-            color: QColor = QColor(255, 0, 0, 127)
+            color: QColor = QColor(255, 0, 0, 127),
+            trim: Optional[list[int, int, int, int]] = None
     ) -> bool:
+        """
+
+        Args:
+            template_path: テンプレートのパスを入力
+            threshold: 閾値
+            use_gray: グレー状態で処理する
+            show_value:
+            show_position:
+            show_only_true_rect:
+            show_rect_frame:
+            color:
+            trim: left_up_x, left_up_y, right_down_x, right_down_y
+
+        Returns:
+
+        """
         self.get_image.emit(True)
         src = cv2.cvtColor(self.src, cv2.COLOR_BGR2GRAY) if use_gray else self.src
         if trim is not None:
@@ -178,6 +294,10 @@ class CommandBase(QObject):
                                                     QColor(0, 255, 0, 255), show_rect_frame)
             return True
         else:
+            if show_position:
+                if trim is not None:
+                    self.send_template_matching_pos((trim[0], trim[1]), (trim[2] - trim[0], trim[3] - trim[1]),
+                                                    QColor(0, 255, 0, 255), show_rect_frame)
             return False
 
     @staticmethod
@@ -286,6 +406,13 @@ class CommandBase(QObject):
         if force or not self.isCanceled:
             s = f"thread id={threading.get_ident()} " + str(s)
             self.print_strings.emit(s, logging.CRITICAL)
+
+    def line_notify(self, txt, token_key="token_1", img: Optional[bool] = None) -> None:
+        if not img:
+            self.line_txt.emit(txt, token_key)
+        else:
+            self.get_image.emit(True)
+            self.line_img.emit(txt, token_key, self.src)
 
     @staticmethod
     def imwrite(filename, img, params=None) -> bool:
