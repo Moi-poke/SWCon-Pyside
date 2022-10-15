@@ -46,12 +46,15 @@ class CaptureWorker(QObject):
             if self.camera is not None:
                 start = time.perf_counter()
                 ret, self.frame = self.camera.read()
-                if ret:
-                    # self.image_rgb = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
-                    h, w, ch = self.frame.shape
-                    bytes_per_line = ch * w
-                    image = self.generate_image(w, h, bytes_per_line)
-                    self.change_pixmap_signal.emit(image)
+                try:
+                    if ret:
+                        # self.image_rgb = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
+                        h, w, ch = self.frame.shape
+                        bytes_per_line = ch * w
+                        image = self.generate_image(w, h, bytes_per_line)
+                        self.change_pixmap_signal.emit(image)
+                except RuntimeError:
+                    break
                 # h, w, ch = self.mp_frame.shape
                 # bytes_per_line = ch * w
                 # image = QImage(self.mp_frame, w, h, bytes_per_line, QImage.Format.Format_BGR888)
