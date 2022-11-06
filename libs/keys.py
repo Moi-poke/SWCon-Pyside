@@ -7,7 +7,7 @@ import time
 from collections import OrderedDict
 from enum import Enum, IntEnum, IntFlag, auto
 from logging import DEBUG, NullHandler, getLogger
-from typing import Any
+from typing import Any, Optional
 
 
 class Button(IntFlag):
@@ -180,10 +180,10 @@ class SendFormat:
         # format(send_btn, 'x') + \
         # print(hex(send_btn))
         str_format = (
-            format(send_btn, "#06x")
-            + (space + str_Hat)
-            + (space + str_L if self.L_stick_changed else "")
-            + (space + str_R if self.R_stick_changed else "")
+                format(send_btn, "#06x")
+                + (space + str_Hat)
+                + (space + str_L if self.L_stick_changed else "")
+                + (space + str_R if self.R_stick_changed else "")
         )
 
         self.L_stick_changed = False
@@ -195,7 +195,6 @@ class SendFormat:
 
 # This class handle L stick and R stick at any angles
 class Direction:
-
     # 各8方向x2を示す語の予約
     UP: Any
     RIGHT: Any
@@ -215,7 +214,11 @@ class Direction:
     R_DOWN_LEFT: Any
     R_UP_LEFT: Any
 
-    def __init__(self, stick, angle, magnification=1.0, isDegree=True, showName=None):
+    def __init__(self, stick,
+                 angle: int | float,
+                 magnification: int | float = 1.0,
+                 isDegree: bool = True,
+                 showName: Optional[str] = None):
         self._logger = getLogger(__name__)
         self._logger.addHandler(NullHandler())
         self._logger.setLevel(DEBUG)
@@ -246,13 +249,13 @@ class Direction:
             self.x = math.ceil(127.5 * math.cos(angle) * self.mag + 127.5)
             self.y = math.floor(127.5 * math.sin(angle) * self.mag + 127.5)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         if self.showName:
             return "<{}, {}>".format(self.stick, self.showName)
         else:
             return "<{}, {}[deg]>".format(self.stick, self.angle_for_show)
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if not type(other) is Direction:
             return False
 
@@ -261,7 +264,7 @@ class Direction:
         else:
             return False
 
-    def getTilting(self):
+    def getTilting(self)->list:
         tilting = []
         if self.stick == Stick.LEFT:
             if self.x < center:
@@ -334,13 +337,13 @@ class KeyPress:
         self.inputEnd_time_0 = time.perf_counter()
         self.was_neutral = True
 
-    def input(self, btns, ifPrint=True):
+    def input(self, btns, ifPrint:bool=True):
         self._pushing = dict(self.format.format)
         if not isinstance(btns, list):
             btns = [btns]
 
         for btn in self.holdButton:
-            if not btn in btns:
+            if btn not in btns:
                 btns.append(btn)
 
         self.format.setButton([btn for btn in btns if type(btn) is Button])
@@ -352,50 +355,47 @@ class KeyPress:
 
         # self._logger.debug(f": {list(map(str,self.format.format.values()))}")
 
-    def inputEnd(self, btns, ifPrint=True, unset_hat=True):
+    def inputEnd(self, buttons, ifPrint=True, unset_hat=True):
         # self._logger.debug(f"input end: {btns}")
         self.pushing2 = dict(self.format.format)
 
-        self.ed = time.perf_counter()
-        if not isinstance(btns, list):
-            btns = [btns]
-        # self._logger.debug(btns)
+        if not isinstance(buttons, list):
+            buttons = [buttons]
 
         # get tilting direction from angles
         tilts = []
-        for dir in [btn for btn in btns if type(btn) is Direction]:
+        for dir in [btn for btn in buttons if type(btn) is Direction]:
             tiltings = dir.getTilting()
             for tilting in tiltings:
                 tilts.append(tilting)
-        # self._logger.debug(tilts)
 
-        self.format.unsetButton([btn for btn in btns if type(btn) is Button])
+        self.format.unsetButton([btn for btn in buttons if type(btn) is Button])
         if unset_hat:
             self.format.unsetHat()
         self.format.unsetDirection(tilts)
         self.ser.writeRow(self.format.convert2str())
 
-    def hold(self, btns):
-        if not isinstance(btns, list):
-            btns = [btns]
+    def hold(self, buttons):
+        if not isinstance(buttons, list):
+            buttons = [buttons]
 
-        for btn in btns:
+        for btn in buttons:
             if btn in self.holdButton:
                 print("Warning: " + btn.name + " is already in holding state")
                 self._logger.warning(f"Warning: {btn.name} is already in holding state")
                 return
 
             self.holdButton.append(btn)
-        self.input(btns)
+        self.input(buttons)
 
-    def holdEnd(self, btns):
-        if not isinstance(btns, list):
-            btns = [btns]
+    def holdEnd(self, buttons):
+        if not isinstance(buttons, list):
+            buttons = [buttons]
 
-        for btn in btns:
+        for btn in buttons:
             self.holdButton.remove(btn)
 
-        self.inputEnd(btns)
+        self.inputEnd(buttons)
 
     def end(self):
         self.ser.writeRow("end")

@@ -39,7 +39,8 @@ class LineNotify(QObject):
         self.status = [responses.status_code for responses in self.res]
         self.chk_token_json = [responses.json() for responses in self.res]
 
-    def is_utf8_file_with_bom(self, filename):
+    @staticmethod
+    def is_utf8_file_with_bom(filename) -> bool:
         """
         utf-8 ファイルが BOM ありかどうかを判定する
         """
@@ -57,7 +58,7 @@ class LineNotify(QObject):
     def retrieve_line_instance(cls, token):
         return cls(tokens=token)
 
-    def send_text(self, notification_message, token_key: str):
+    def send_text(self, notification_message, token_key: str) -> None:
         """
         LINEにテキストを通知する
 
@@ -74,7 +75,7 @@ class LineNotify(QObject):
         except KeyError:
             self.print_strings.emit("token名が間違っています", logging.ERROR)
 
-    def send_text_n_image(self, img: cv2, notification_message: str | int, token_key: str):
+    def send_text_n_image(self, img: cv2, notification_message: str | int, token_key: str) -> None:
         """
         カメラが開いていないときはテキストのみを通知し、
         開いているときはテキストと画像を通知する
@@ -98,14 +99,14 @@ class LineNotify(QObject):
         except KeyError:
             self.print_strings.emit("token名が間違っています", logging.ERROR)
 
-    def get_rate_limit(self):
+    def get_rate_limit(self) -> None:
         try:
             for i in range(self.token_num):
-                print(f'For: {list(self.token_list.keys())[i]}')
-                print('X-RateLimit-Limit: ' + self.res[i].headers['X-RateLimit-Limit'])
-                print('X-RateLimit-ImageLimit: ' + self.res[i].headers['X-RateLimit-ImageLimit'])
-                print('X-RateLimit-Remaining: ' + self.res[i].headers['X-RateLimit-Remaining'])
-                print('X-RateLimit-ImageRemaining: ' + self.res[i].headers['X-RateLimit-ImageRemaining'])
+                # print(f'For: {list(self.token_list.keys())[i]}')
+                # print('X-RateLimit-Limit: ' + self.res[i].headers['X-RateLimit-Limit'])
+                # print('X-RateLimit-ImageLimit: ' + self.res[i].headers['X-RateLimit-ImageLimit'])
+                # print('X-RateLimit-Remaining: ' + self.res[i].headers['X-RateLimit-Remaining'])
+                # print('X-RateLimit-ImageRemaining: ' + self.res[i].headers['X-RateLimit-ImageRemaining'])
                 import datetime
                 dt = datetime.datetime.fromtimestamp(int(self.res[i].headers['X-RateLimit-Reset']),
                                                      datetime.timezone(datetime.timedelta(hours=9)))
@@ -113,7 +114,7 @@ class LineNotify(QObject):
 
                 self.logger.info(f"LINE API - Limit: {self.res[i].headers['X-RateLimit-Limit']}")
                 self.logger.info(f"LINE API - Remaining: {self.res[i].headers['X-RateLimit-Remaining']}")
-                self.logger.info(f"LINE API - ImageLimit: {self.res[i].headers['X-RateLimit-Limit']}")
+                self.logger.info(f"LINE API - ImageLimit: {self.res[i].headers['X-RateLimit-ImageLimit']}")
                 self.logger.info(f"LINE API - ImageRemaining: {self.res[i].headers['X-RateLimit-ImageRemaining']}")
                 self.logger.info(f"Reset time: {dt}")
         except AttributeError as e:

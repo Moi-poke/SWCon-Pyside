@@ -6,6 +6,7 @@ import threading
 import time
 from datetime import datetime
 from multiprocessing import Array, Process, shared_memory
+from typing import Optional
 
 import cv2
 import numpy
@@ -20,7 +21,7 @@ class CaptureWorker(QObject):
     send_img = Signal(numpy.ndarray)
     playing = True
 
-    def __init__(self, parent=None, fps=60, camera_id=0):
+    def __init__(self, parent=None, fps: int = 60, camera_id: int = 0):
         super().__init__(parent)
         self.height = 720
         self.width = 1280
@@ -39,7 +40,7 @@ class CaptureWorker(QObject):
         # self.mp_frame = np.ndarray(self.a.shape, dtype=self.a.dtype, buffer=self.shm.buf)
         # self.p = Process(target=cam(self.camera_id))
 
-    def run(self):
+    def run(self) -> None:
         # self.p.start()
         self.open_camera(self.camera_id)
         while self.playing:
@@ -62,7 +63,17 @@ class CaptureWorker(QObject):
                 time.sleep(max(1 / self.fps - (time.perf_counter() - start), 0))
         self.destroy()
 
-    def generate_image(self, w, h, bytes_per_line):
+    def generate_image(self, w: int, h: int, bytes_per_line) -> QImage:
+        """
+        OpenCVで取得した画像に画像認識枠などを書き込む処理
+        Args:
+            w: image width
+            h: image height
+            bytes_per_line:
+
+        Returns: QImage
+
+        """
         img = QImage(copy.deepcopy(self.frame), w, h, bytes_per_line, QImage.Format.Format_BGR888)
         if self.rect_list:
             self.rect_draw = True
@@ -87,7 +98,7 @@ class CaptureWorker(QObject):
             pass
         return img
 
-    def open_camera(self, camera_id):
+    def open_camera(self, camera_id: int) -> None:
         # self.p.kill()
         # self.p = Process(target=cam(camera_id))
         # self.p.start()
@@ -116,7 +127,11 @@ class CaptureWorker(QObject):
         else:
             self.debug("Same Camera ID")
 
-    def saveCapture(self, filename=None, crop=None, crop_ax=None, img=None, capture_dir="./ScreenShot"):
+    def saveCapture(self, filename: str | pathlib.Path = None,
+                    crop: Optional[int] = None,
+                    crop_ax: Optional[list[int, int, int, int]] = None,
+                    img: np.ndarray = None,
+                    capture_dir: str = "./ScreenShot") -> None:
         if crop_ax is None:
             crop_ax = [0, 0, 1280, 720]
         else:
@@ -154,7 +169,7 @@ class CaptureWorker(QObject):
         else:
             self.error(f"Capture Failed.")
 
-    def imwrite(self, filename, img, params=None):
+    def imwrite(self, filename: str | pathlib.Path, img: np.ndarray, params: Optional = None) -> bool:
         try:
             ext = os.path.splitext(filename)[1]
             result, n = cv2.imencode(".png", img, params)
@@ -170,46 +185,46 @@ class CaptureWorker(QObject):
             self.error(f"Image Write Error: {e}")
         return False
 
-    def set_fps(self, fps):
+    def set_fps(self, fps: int) -> None:
         self.fps = int(fps)
 
-    def stop(self):
+    def stop(self) -> None:
         self.playing = False
         self.wait()
 
-    def destroy(self):
+    def destroy(self) -> None:
         if self.camera is not None and self.camera.isOpened():
             self.camera.release()
             self.camera = None
             self.debug("Camera destroyed")
 
     @Slot(bool)
-    def callback_return_img(self, bl: bool):
+    def callback_return_img(self, bl: bool) -> None:
         # print("RECEIVE SIGNAL")
         if bl:
             # print("SEND IMG")
             self.send_img.emit(self.frame)
 
     # ログをメインに飛ばすため
-    def debug(self, s):
+    def debug(self, s: str) -> None:
         s = f"thread id={threading.get_ident()} " + s
         self.print_strings.emit(s, logging.DEBUG)
 
-    def info(self, s):
+    def info(self, s: str) -> None:
         s = f"thread id={threading.get_ident()} " + s
         self.print_strings.emit(s, logging.INFO)
 
-    def warning(self, s):
+    def warning(self, s: str) -> None:
         s = f"thread id={threading.get_ident()} " + s
         self.print_strings.emit(s, logging.WARNING)
 
-    def error(self, s):
+    def error(self, s: str) -> None:
         s = f"thread id={threading.get_ident()} " + s
         self.print_strings.emit(s, logging.ERROR)
 
-    def critical(self, s):
+    def critical(self, s: str) -> None:
         s = f"thread id={threading.get_ident()} " + s
         self.print_strings.emit(s, logging.CRITICAL)
 
-    def wait(self):
+    def wait(self) -> None:
         pass

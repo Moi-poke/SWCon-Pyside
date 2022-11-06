@@ -10,10 +10,15 @@ class QPlainTextEditLogger(logging.Handler):
         super().__init__()
         self.widget = QtWidgets.QPlainTextEdit(parent)
         self.widget.setReadOnly(True)
+        self.widget.appendPlainText("")
 
     def emit(self, record):
         msg = self.format(record)
-        self.widget.appendPlainText(msg)
+        # self.widget.appendPlainText(msg)
+        if "ERROR" in str(msg) or "CRITICAL" in str(msg) or "FATAL" in str(msg):
+            self.widget.appendHtml(f"<span style=\"color:#ff0000;\" > {msg} </span>")
+        else:
+            self.widget.appendHtml(f"<span style=\"color:#000000;\" > {msg} </span>")
 
 
 class MyDialog(QtWidgets.QMdiSubWindow):

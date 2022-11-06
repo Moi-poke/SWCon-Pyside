@@ -55,52 +55,52 @@ class Sender(QObject):
         ]
         self.Hat = ["TOP", "TOP_RIGHT", "RIGHT", "BTM_RIGHT", "BTM", "BTM_LEFT", "LEFT", "TOP_LEFT", "CENTER"]
 
-    def openSerial(self, portNum: int, portName: str = ""):
+    def openSerial(self, port_num: int, port_name: str = "") -> bool:
         try:
 
             self.f = open(f"./macro/{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.log", "w")
-            if portName is None or portName == "":
+            if port_name is None or port_name == "":
                 if os.name == "nt":
                     # print("connecting to " + "COM" + str(portNum))
-                    self._logger.info("Connecting to " + "COM" + str(portNum))
-                    self.ser = serial.Serial("COM" + str(portNum), 9600)
+                    self._logger.info("Connecting to " + "COM" + str(port_num))
+                    self.ser = serial.Serial("COM" + str(port_num), 9600)
                     return True
                 elif os.name == "posix":
                     if platform.system() == "Darwin":
-                        print("connecting to " + "/dev/tty.usbserial-" + str(portNum))
-                        self._logger.info("Connecting to " + "/dev/tty.usbserial-" + str(portNum))
-                        self.ser = serial.Serial("/dev/tty.usbserial-" + str(portNum), 9600)
+                        print("connecting to " + "/dev/tty.usbserial-" + str(port_num))
+                        self._logger.info("Connecting to " + "/dev/tty.usbserial-" + str(port_num))
+                        self.ser = serial.Serial("/dev/tty.usbserial-" + str(port_num), 9600)
                         return True
                     else:
-                        print("connecting to " + "/dev/ttyUSB" + str(portNum))
-                        self._logger.info("Connecting to " + "/dev/ttyUSB" + str(portNum))
-                        self.ser = serial.Serial("/dev/ttyUSB" + str(portNum), 9600)
+                        print("connecting to " + "/dev/ttyUSB" + str(port_num))
+                        self._logger.info("Connecting to " + "/dev/ttyUSB" + str(port_num))
+                        self.ser = serial.Serial("/dev/ttyUSB" + str(port_num), 9600)
                         return True
                 else:
                     print("Not supported OS")
                     self._logger.warning("Not supported OS")
                     return False
             else:
-                print("Connecting to " + portName)
-                self._logger.info("connecting to " + portName)
-                self.ser = serial.Serial(portName, 9600)
+                print("Connecting to " + port_name)
+                self._logger.info("connecting to " + port_name)
+                self.ser = serial.Serial(port_name, 9600)
                 return True
         except IOError as e:
             # print("COM Port: can't be established")
-            self._logger.error("COM Port: can't be established", e)
+            self._logger.error(f"COM Port: can't be established {e}")
             # print(e)
             return False
 
-    def closeSerial(self):
+    def closeSerial(self) -> None:
         self._logger.debug("Closing the serial communication")
         self.ser.close()
         self.f.close()
 
-    def isOpened(self):
+    def isOpened(self) -> bool:
         self._logger.debug("Checking if serial communication is open")
         return True if self.ser is not None and self.ser.isOpen() else False
 
-    def writeRow(self, row, is_show=False):
+    def writeRow(self, row, is_show=False) -> None:
         try:
             self.time_bef = time.perf_counter()
             if self.before is not None and self.before != "end" and is_show:
@@ -130,6 +130,14 @@ class Sender(QObject):
         # Show sending serial datas
 
     def show_input(self, output):
+        """
+        NOT WORKING
+        Args:
+            output:
+
+        Returns:
+
+        """
         try:
             # print(output)
             btns = [self.Buttons[x] for x in range(0, 16) if int(output[0], 16) >> x & 1]
@@ -340,17 +348,17 @@ class Sender(QObject):
             self._logger.error("Error:", e)
 
     # ログをメインに飛ばすため
-    def debug(self, s, force=False):
+    def debug(self, s: str, force=False) -> None:
         self.print_strings.emit(s, logging.DEBUG)
 
-    def info(self, s, force=False):
+    def info(self, s: str, force=False) -> None:
         self.print_strings.emit(s, logging.INFO)
 
-    def warning(self, s, force=False):
+    def warning(self, s: str, force=False) -> None:
         self.print_strings.emit(s, logging.WARNING)
 
-    def error(self, s, force=False):
+    def error(self, s: str, force=False) -> None:
         self.print_strings.emit(s, logging.ERROR)
 
-    def critical(self, s, force=False):
+    def critical(self, s: str, force=False) -> None:
         self.print_strings.emit(s, logging.CRITICAL)
