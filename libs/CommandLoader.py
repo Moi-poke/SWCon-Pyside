@@ -17,7 +17,7 @@ class CommandLoader:
         # return command class types
         return self.getCommandClasses()
 
-    def reload(self):
+    def reload(self) -> list:
         loaded_module_dic = {mod.__name__: mod for mod in self.modules}
         cur_module_names = getModuleNames(self.path)
 
@@ -38,7 +38,7 @@ class CommandLoader:
         # return command class types
         return self.getCommandClasses()
 
-    def getCommandClasses(self):
+    def getCommandClasses(self) -> list:
         classes = []
         for mod in self.modules:
             classes.extend(

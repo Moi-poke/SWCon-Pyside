@@ -14,7 +14,7 @@ import numpy as np
 from PySide6.QtCore import QObject, Signal, Slot
 from PySide6.QtGui import QColor, QPainter
 
-from libs.keys import Button
+from libs.keys import Button, Hat, Direction
 from concurrent.futures import ThreadPoolExecutor
 
 
@@ -51,6 +51,11 @@ class CommandBase(QObject):
         # print("init")
 
     def __post_init__(self):
+        """
+        init後、run実行前に実行される処理。
+        スクリプトリロード時に処理させたい内容
+        情報表示など
+        """
         ...
 
     def run(self):
@@ -60,11 +65,9 @@ class CommandBase(QObject):
         except StopSignal as e:
             self.stop_function.emit(True)
             self.info("Command finished successfully")
-        # except ZeroDivisionError:
-        #     self.error(111, force=True)
         except Exception as e:
-            self.error(e)
-            self.error("エラーが発生しました", force=True)
+            # self.error(e)
+            self.error(f"{e} エラーが発生しました", force=True)
             self.stop_function.emit(True)
             # raise StopSignal
             pass
@@ -90,13 +93,17 @@ class CommandBase(QObject):
         self.isCanceled = True
         raise StopSignal
 
-    def press(self, buttons, duration: float = 0.1, wait: float = 0.1):
+    def press(self,
+              buttons: Button | Hat | Direction | list[Button | Hat | Direction],
+              duration: float = 0.1,
+              wait: float = 0.1):
         if not self.isCanceled:
             self.serial_input.emit(buttons, duration, wait, "press")
         else:
             raise StopSignal
 
-    def pressRep(self, buttons, repeat: int, duration: float = 0.1, wait: float = 0.1, interval: float = 0.1):
+    def pressRep(self, buttons: Button | Hat | Direction | list[Button | Hat | Direction],
+                 repeat: int, duration: float = 0.1, wait: float = 0.1, interval: float = 0.1):
         if not self.isCanceled:
             for _ in range(repeat):
                 self.press(buttons, duration, wait)
@@ -104,13 +111,14 @@ class CommandBase(QObject):
         else:
             raise StopSignal
 
-    def hold(self, buttons, duration: float = 0.1):
+    def hold(self, buttons: Button | Hat | Direction | list[Button | Hat | Direction],
+             duration: float = 0.1):
         if not self.isCanceled:
             self.serial_input.emit(buttons, duration, "hold")
         else:
             raise StopSignal
 
-    def holdEnd(self, buttons):
+    def holdEnd(self, buttons: Button | Hat | Direction | list[Button | Hat | Direction]):
         if not self.isCanceled:
             self.serial_input.emit(buttons, "hold end")
         else:
@@ -193,20 +201,20 @@ class CommandBase(QObject):
         if trim is not None:
             src = src[trim[1]:trim[3], trim[0]:trim[2]]
 
-        results = []
+        results_1 = []
         with ThreadPoolExecutor(max_workers=8) as executor:
             res = executor.map(self.read_template, [[s, use_gray] for s in template_path_list], timeout=None)
             for _ in res:
-                results.append(_)
+                results_1.append(_)
 
-        args = [[src, i[0], i[1]] for i in results]
-        results = {}
+        args = [[src, i[0], i[1]] for i in results_1]
+        results_2 = {}
         with ThreadPoolExecutor(max_workers=8) as executor:
             res = executor.map(get_res, args)
             for _ in res:
-                results |= _
+                results_2 |= _
 
-        return results
+        return results_2
 
     def read_template(self, *args) -> list:
         # print(*args)
@@ -232,12 +240,12 @@ class CommandBase(QObject):
         Args:
             template_path: テンプレートのパスを入力
             threshold: 閾値
-            use_gray: グレー状態で処理する
-            show_value:
-            show_position:
-            show_only_true_rect:
-            show_rect_frame:
-            color:
+            use_gray: グレーで画像認識
+            show_value: 一致度
+            show_position: どこでみつかったか
+            show_only_true_rect: 見つかった箇所のみ枠を表示
+            show_rect_frame: 枠を表示
+            color: QColor, 枠の色
             trim: left_up_x, left_up_y, right_down_x, right_down_y
 
         Returns:
@@ -283,7 +291,7 @@ class CommandBase(QObject):
             else:
                 top_lefts.append((boxes[i][0], boxes[i][1]))
             # bottom_rights.append((boxes[i][2], boxes[i][3]))
-        tag = str(time.perf_counter()) + str(random.random())
+        # tag = str(time.perf_counter()) + str(random.random())
         if max_val >= threshold:
             if show_position:
                 for i in range(box_n):
@@ -301,7 +309,7 @@ class CommandBase(QObject):
             return False
 
     @staticmethod
-    def non_max_suppression(boxes, scores, overlap_thresh):
+    def non_max_suppression(boxes: np.ndarray, scores: np.ndarray, overlap_thresh: float) -> np.ndarray:
         """
         https://pystyle.info/opencv-non-maximum-suppression/ を参考にしました。
         Non Maximum Suppression (NMS) を行う。
@@ -382,32 +390,32 @@ class CommandBase(QObject):
             pass
 
     # ログをメインに飛ばすため
-    def debug(self, s, force=False):
+    def debug(self, s: any, force=False):
         if force or not self.isCanceled:
             s = f"thread id={threading.get_ident()} " + str(s)
             self.print_strings.emit(s, logging.DEBUG)
 
-    def info(self, s, force=False):
+    def info(self, s: any, force=False):
         if force or not self.isCanceled:
             s = f"thread id={threading.get_ident()} " + str(s)
             self.print_strings.emit(s, logging.INFO)
 
-    def warning(self, s, force=False):
+    def warning(self, s: any, force=False):
         if force or not self.isCanceled:
             s = f"thread id={threading.get_ident()} " + str(s)
             self.print_strings.emit(s, logging.WARNING)
 
-    def error(self, s, force=False):
+    def error(self, s: any, force=False):
         if force or not self.isCanceled:
             s = f"thread id={threading.get_ident()} " + str(s)
             self.print_strings.emit(s, logging.ERROR)
 
-    def critical(self, s, force=False):
+    def critical(self, s: any, force=False):
         if force or not self.isCanceled:
             s = f"thread id={threading.get_ident()} " + str(s)
             self.print_strings.emit(s, logging.CRITICAL)
 
-    def line_notify(self, txt, token_key="token_1", img: Optional[bool] = None) -> None:
+    def line_notify(self, txt: any, token_key: str = "token_1", img: Optional[bool] = None) -> None:
         if not img:
             self.line_txt.emit(txt, token_key)
         else:
@@ -415,7 +423,7 @@ class CommandBase(QObject):
             self.line_img.emit(txt, token_key, self.src)
 
     @staticmethod
-    def imwrite(filename, img, params=None) -> bool:
+    def imwrite(filename: str, img, params=None) -> bool:
         try:
             # print(img)
             ext = os.path.splitext(filename)[1]

@@ -1,54 +1,58 @@
 QLabel {
-    color: red
+    color: black
 }
 
 QWidget#joycon_l{
     border-style: solid;
-    border-color: rgba( 0, 195, 227, 255);
-	background-color: rgb(0, 195, 227);
-    border-width: 1px;
+    border-color: 	#001E1E;
+	background-color: 	#08a5cc;
+    border-width: 0.2px;
     border-top-left-radius: 90px;
     border-bottom-left-radius: 90px;
 }
 
 QWidget#joycon_r{
     border-style: solid;
-    border-color: rgba( 255, 69, 84, 255);
-    background-color: rgb(255, 69, 84);
-    border-width: 1px;
+    border-color: #1E0A0A;
+    background-color: #e63825;
+    border-width: 0.2px;
     border-top-right-radius: 90px;
     border-bottom-right-radius: 90px;
 }
 
 QPushButton[objectName*="BTN"] {
-    color: #ffffff;
-    background-color: #414548;
-    border-color: #414548;
+    color: rgba(255,255,255,255);
+    background-color: rgba(10,10,10,255);
+    border-color: #1E1914;
     border-style: solid;
     border-width: 0.5px;
     border-radius: 15px;
+    font-size: 16px
 }
 
 QPushButton[objectName*="BTN"]:hover{
-    color: #0f2f48;
-    background-color: #6F767B;
+    color: rgba(255,255,255,255);
+    background-color: rgba(10,10,10,230);
     border-color: #0f2f48;
+    font-size: 18px
 }
 
 QPushButton[objectName*="BTN"]:checked{
-    background-color: #0B1115;
+    background-color: rgba(10,10,10,240);
     border-radius: 15px;
     padding: 2px;
     outline: none;
+    font-size: 16px
 }
 
 QPushButton[objectName*="BTN"]:pressed {
-    color: #111315;
-    background-color: #cbe0ee;
+    color: rgba(255,255,255,255);
+    background-color: rgba(10,10,10,240);
+    font-size: 16px
 }
 
 QPushButton[objectName*="BTN"]:disabled {
-    color: #ffffff;
+    color: rgba(255,255,255,255);
     background-color: #B4BFC8;
     border-style: solid;
     border-width: 0.5px;
@@ -56,8 +60,8 @@ QPushButton[objectName*="BTN"]:disabled {
 }
 
 QPushButton#BTN_capture{
-    color: #ffffff;
-    background-color: #414548;
+    color: rgba(255,255,255,255);
+    background-color: rgba(10,10,10,255);
     border-color: #414548;
     border-style: solid;
     border-width: 0.5px;
@@ -65,20 +69,22 @@ QPushButton#BTN_capture{
 }
 QPushButton#BTN_capture:hover{
     color: #0f2f48;
-    background-color: #6F767B;
+    background-color: rgba(10,10,10,230);
     border-color: #0f2f48;
 }
 
 QPushButton#BTN_capture:checked{
-    background-color: #0B1115;
+    background-color: rgba(10,10,10,240);
     border-radius: 4px;
     padding: 2px;
     outline: none;
+    font-size: 16px
 }
 
 QPushButton#BTN_capture:pressed {
     color: #111315;
-    background-color: #cbe0ee;
+    background-color: rgba(10,10,10,240);
+    font-size: 16px
 }
 
 QPushButton#BTN_capture:disabled {
