@@ -1,5 +1,8 @@
 # Description
-[Poke-Controller](https://github.com/KawaSwitch/Poke-Controller)をベースにPySide6で主要機能を再構築
+[Poke-Controller](https://github.com/KawaSwitch/Poke-Controller)をベースにPySide6で主要機能を再構築しています
+
+
+![image](https://user-images.githubusercontent.com/59233665/204475385-c8cacfe3-5b35-49ed-b77b-cde447c9be91.png)
 
 
 # Requirements
