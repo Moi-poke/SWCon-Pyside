@@ -28,7 +28,17 @@ class CommandLoader:
 
         # Reload commands except deleted ones
         for mod_name in list(set(cur_module_names) & set(loaded_module_dic.keys())):
-            importlib.reload(loaded_module_dic[mod_name])
+            try:
+                importlib.reload(loaded_module_dic[mod_name])
+            except ValueError as e:
+                print(f"Import module Error at {mod_name}: {e} ", file=sys.stderr)
+                pass
+            except SyntaxError as e:
+                print(f"Syntax Error at {mod_name}: {e} ", file=sys.stderr)
+                pass
+            except Exception as e:
+                print(f"Error at {mod_name}: {e} ", file=sys.stderr)
+                pass
 
         # Unload deleted commands
         for mod_name in list(set(loaded_module_dic.keys()) - set(cur_module_names)):

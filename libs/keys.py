@@ -9,6 +9,8 @@ from enum import Enum, IntEnum, IntFlag, auto
 from logging import DEBUG, NullHandler, getLogger
 from typing import Any, Optional
 
+from PySide6.QtCore import QObject
+
 
 class Button(IntFlag):
     Y = auto()
@@ -219,6 +221,15 @@ class Direction:
                  magnification: int | float = 1.0,
                  isDegree: bool = True,
                  showName: Optional[str] = None):
+        """
+
+        Args:
+            stick: LStick or RStick
+            angle: if isDegree:
+            magnification:
+            isDegree: True->度数法, False->弧度法
+            showName:
+        """
         self._logger = getLogger(__name__)
         self._logger.addHandler(NullHandler())
         self._logger.setLevel(DEBUG)
@@ -381,7 +392,7 @@ class KeyPress:
 
         for btn in buttons:
             if btn in self.holdButton:
-                print("Warning: " + btn.name + " is already in holding state")
+                # print("Warning: " + btn.name + " is already in holding state")
                 self._logger.warning(f"Warning: {btn.name} is already in holding state")
                 return
 

@@ -127,6 +127,10 @@ class CaptureWorker(QObject):
         else:
             self.debug("Same Camera ID")
 
+    @Slot(str)
+    def callback_screen_shot(self, path):
+        self.saveCapture(capture_dir=path)
+
     def saveCapture(self, filename: str | pathlib.Path = None,
                     crop: Optional[int] = None,
                     crop_ax: Optional[list[int, int, int, int]] = None,
@@ -137,6 +141,10 @@ class CaptureWorker(QObject):
         else:
             pass
             # print(crop_ax)
+
+        if capture_dir is None:
+            capture_dir = "."
+
 
         dt_now = datetime.now()
         if filename is None or filename == "":
@@ -156,6 +164,7 @@ class CaptureWorker(QObject):
             image = self.frame
 
         capture_dir = pathlib.Path(capture_dir)
+        # capture_dir = pathlib.Path("./ScreenShot") / pathlib.Path(capture_dir)
 
         if not capture_dir.exists():
             capture_dir.mkdir(parents=True, exist_ok=True)

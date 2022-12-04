@@ -3,3 +3,4 @@
 *.pyc
 config/settings.toml
 ScreenShot/*
+/no_git/

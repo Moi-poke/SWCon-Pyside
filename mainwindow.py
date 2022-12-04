@@ -15,9 +15,12 @@ import PySide6
 import numpy as np
 import shiboken6
 from PySide6 import QtCore, QtWidgets
-from PySide6.QtCore import QSize, Qt, QThread, Signal, Slot
-from PySide6.QtGui import QColor, QImage, QPainter, QPen, QPixmap
+from PySide6.QtCore import QSize, Qt, QThread, Signal, Slot, QTimer
+from PySide6.QtGui import QColor, QImage, QPainter, QPen, QPixmap, QIcon
 from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox
+from Crypto.Cipher import PKCS1_OAEP, AES
+from Crypto.PublicKey import RSA
+# from Crypto.Random import get_random_bytes
 
 from libs import sender
 from libs.capture import CaptureWorker
@@ -41,6 +44,7 @@ Author = "Moi"
 # GUIの起動
 class MainWindow(QMainWindow, Ui_MainWindow):
     stop_request = Signal(bool)
+    CAPTURE_REQUEST = Signal(str)
 
     def __init__(
             self,
@@ -54,11 +58,22 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             flags (PySide6.QtCore.Qt.WindowFlags, optional): _description_. Defaults to QtCore.Qt.Window.
         """
         super().__init__(parent, flags)
+        self.script_stop_request = False
+        self.wait_ret = None
         self.logger = getLogger(__name__)
-        self.thread_1 = None
+
+        self.py_loader = None
+        self.mcu_loader = None
+        self.py_classes = None
+        self.mcu_classes = None
+        self.cur_command = None
+        self.mcu_cur_command = None
+        self.py_cur_command = None
+
+        self.video_capture_thread = None
         self.capture_worker = None
-        self.thread_2 = None
-        self.worker = None
+        self.script_execution_thread = None
+        self.script_worker = None
         self.GamepadController_worker = None
         self.GamepadController_thread = QThread()
         self.thread_do = None
@@ -147,8 +162,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.logger.debug("There seems to have been a change in the script.")
 
         # スレッドの開始
-        if self.thread_1 is not None:
-            self.thread_1.start()
+        if self.video_capture_thread is not None:
+            self.video_capture_thread.start()
         self.GamepadController_thread.start()
 
         if self.setting is not None:
@@ -165,6 +180,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.line_notify = LineNotify(tokens=self.setting.setting["line"])
         self.line_notify.print_strings.connect(self.callback_string_to_log)
         # self.logger.debug(self.line_notify.send_text("test", token_key="token_3"))
+
+    def update(self):
+        print("timer stop")
+
+        self.wait_ret = True
 
     def test(self):
         self.BTN_a.toggle()
@@ -868,21 +888,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     # </editor-fold>
 
     def connect_capture(self):
-        self.thread_1 = QThread()
+        self.video_capture_thread = QThread()
         try:
             self.capture_worker = CaptureWorker(camera_id=int(self.lineEditCameraID.text()))
         except:
             self.capture_worker = CaptureWorker(camera_id=-1)
 
-        self.capture_worker.moveToThread(self.thread_1)
+        self.capture_worker.moveToThread(self.video_capture_thread)
 
         self.capture_worker.change_pixmap_signal.connect(self.update_image, type=Qt.QueuedConnection)
         self.capture_worker.print_strings.connect(self.callback_string_to_log, type=Qt.QueuedConnection)
 
-        self.thread_1.started.connect(self.capture_worker.run)
+        self.video_capture_thread.started.connect(self.capture_worker.run)
 
-        self.thread_1.finished.connect(self.capture_worker.deleteLater)
-        self.thread_1.finished.connect(self.thread_1.deleteLater)
+        self.video_capture_thread.finished.connect(self.capture_worker.deleteLater)
+        self.video_capture_thread.finished.connect(self.video_capture_thread.deleteLater)
 
     def setup_functions_connect(self):
 
@@ -946,7 +966,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # 各ボタンの関数割当
         self.pushButton_PythonStart.pressed.connect(self.start_command)
-        self.pushButton_PythonStop.pressed.connect(self.stop_command)
+        self.pushButton_PythonStop.pressed.connect(lambda: self.stop_command(True))
 
         self.pushButton_MCUStart.pressed.connect(self.start_mcu_command)
         self.pushButton_MCUStop.pressed.connect(self.stop_mcu_command)
@@ -955,7 +975,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pushButton_MCUReload.clicked.connect(self.reload_commands)
 
         self.pushButtonReloadPort.clicked.connect(self.activate_serial)
-        self.pushButtonScreenShot.clicked.connect(self.screen_shot)
+        try:
+            self.pushButtonScreenShot.clicked.connect(
+                lambda: self.capture_worker.callback_screen_shot(self.cur_command.CAPTURE_DIR),
+                type=Qt.DirectConnection)
+        except:
+            self.logger.error("スクリーンショットボタンは機能していません")
         self.toolButtonOpenScreenShotDir.clicked.connect(self.open_screen_shot_dir)
         self.toolButtonOpenPythonDir.clicked.connect(self.open_python_shot_dir)
         self.toolButton_OpenMCUDir.clicked.connect(self.open_mcu_shot_dir)
@@ -1014,10 +1039,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     @Slot(QImage)
     def update_image(self, image):
-        self.img = image
-        pix = QPixmap.fromImage(self.img)
-        # pix.scaled(1280, 720, aspectMode=QtCore.Qt.KeepAspectRatio)
-        self.CaptureImageArea.setPixmap(pix)
+        try:
+            self.img = image
+            pix = QPixmap.fromImage(self.img)
+            # pix.scaled(1280, 720, aspectMode=QtCore.Qt.KeepAspectRatio)
+            self.CaptureImageArea.setPixmap(pix)
+        except KeyboardInterrupt:
+            self.close()
 
     @Slot(str)
     def update_log(self, s):
@@ -1069,8 +1097,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def set_command_items(self):
         i = 0
-        for v in [c.NAME for c in self.py_classes]:
-            self.comboBoxPython.addItem(v)
+        for v in [c for c in self.py_classes]:
+            s = v
+            v = v.NAME
+            # print("###",v, s.__name__)
+            pass_verify = self.verify_script(s.__name__)
+            if v == pass_verify:
+                self.comboBoxPython.addItem(QIcon("assets/verify.png"), v)
+            else:
+                self.comboBoxPython.addItem(QIcon("assets/not_verify.png"), v)
+
             if (s := self.py_classes[i]().__tool_tip__) is not None:
                 self.comboBoxPython.setItemData(i, s, QtCore.Qt.ToolTipRole)
             i += 1
@@ -1079,6 +1115,30 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         for v in [c.NAME for c in self.mcu_classes]:
             self.comboBox_MCU.addItem(v)
         self.comboBox_MCU.setCurrentIndex(0)
+
+    @staticmethod
+    def verify_script(name):
+        try:
+            file_in = open(f"Commands/Python/verification/{name}.key", "rb")
+            private_key = RSA.import_key(open("config/private_key.pem").read())
+
+            enc_session_key, nonce, tag, ciphertext = \
+                [file_in.read(x) for x in (private_key.size_in_bytes(), 16, 16, -1)]
+            file_in.close()
+            # キーを復号する
+            cipher_rsa = PKCS1_OAEP.new(private_key)
+            session_key = cipher_rsa.decrypt(enc_session_key)
+
+            # データを復号する
+            cipher_aes = AES.new(session_key, AES.MODE_EAX, nonce)
+            data = cipher_aes.decrypt_and_verify(ciphertext, tag)
+            # print(data.decode("utf-8"))
+            return data.decode("utf-8")
+        except FileNotFoundError:
+            # print(f"No key for {name}")
+            return False
+        except Exception:
+            return False
 
     def assign_command(self):
         # 選択されているコマンドを取得する
@@ -1095,7 +1155,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # 表示しているタブを読み取って、どのコマンドを表示しているか取得、リロード後もそれが選択されるようにする
         oldval_mcu = self.comboBox_MCU.itemText(self.comboBox_MCU.currentIndex())
         oldval_py = self.comboBoxPython.itemText(self.comboBoxPython.currentIndex())
-        print(oldval_mcu)
+        # print(oldval_mcu)
 
         self.comboBox_MCU.clear()
         self.comboBoxPython.clear()
@@ -1123,7 +1183,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def screen_shot(self):
         try:
-            self.capture_worker.saveCapture(capture_dir=self.cur_command.CAPTURE_DIR)
+            # self.capture_worker.saveCapture(capture_dir=self.cur_command.CAPTURE_DIR)  # Todo キャプチャのsignal/slotをする
+            # noinspection PyUnresolvedReferences
+            # self.CAPTURE_REQUEST.emit(str(self.cur_command.CAPTURE_DIR))
+            self.logger.debug("This function has been deprecated")
         except Exception as e:
             self.logger.error(e)
             pass
@@ -1162,39 +1225,45 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         os.startfile(os.path.realpath(self.cur_command.__directory__))
 
     def start_command(self):
+        # print(time.perf_counter())
+        self.script_stop_request = False
+        # self.pushButton_PythonStop.pressed.unconnect()
         self.GamepadController_worker.pause = True
         self.assign_command()
         self.pushButton_PythonStart.setEnabled(False)
-        # if self.thread_2 is not None:
+        # if self.script_execution_thread is not None:
         self.stop_command()
-        if self.thread_2 is None:
-            self.thread_2 = QThread()
-        self.worker = self.cur_command()
+        if self.script_execution_thread is None:
+            self.script_execution_thread = QThread()
+        self.script_worker = self.cur_command()
 
-        self.worker.moveToThread(self.thread_2)
+        self.script_worker.moveToThread(self.script_execution_thread)
 
-        self.worker.print_strings.connect(self.callback_string_to_log, type=Qt.QueuedConnection)
-        self.stop_request.connect(self.worker.stop, type=Qt.QueuedConnection)
-        self.worker.stop_function.connect(self.callback_stop_command, type=Qt.QueuedConnection)
+        self.script_worker.print_strings.connect(self.callback_string_to_log, type=Qt.QueuedConnection)
+        # noinspection PyUnresolvedReferences
+        self.stop_request.connect(self.script_worker.stop, type=Qt.DirectConnection)
+        self.script_worker.stop_function.connect(self.callback_stop_command, type=Qt.QueuedConnection)
 
-        self.worker.serial_input.connect(self.callback_keypress, type=Qt.DirectConnection)
-        self.worker.get_image.connect(self.callback_return_img, type=Qt.DirectConnection)
-        self.worker.recognize_rect.connect(self.callback_show_recognize_rect, type=Qt.DirectConnection)
-        self.capture_worker.send_img.connect(self.worker.callback_receive_img, type=Qt.DirectConnection)
-        self.worker.line_txt.connect(self.callback_line_txt, type=Qt.DirectConnection)
-        self.worker.line_img.connect(self.callback_line_img, type=Qt.DirectConnection)
-        self.worker.send_serial.connect(self.callback_run_macro, type=Qt.DirectConnection)
+        self.script_worker.serial_input.connect(self.callback_keypress, type=Qt.DirectConnection)
+        self.script_worker.get_image.connect(self.callback_return_img, type=Qt.DirectConnection)
+        self.script_worker.recognize_rect.connect(self.callback_show_recognize_rect, type=Qt.DirectConnection)
+        self.capture_worker.send_img.connect(self.script_worker.callback_receive_img, type=Qt.DirectConnection)
+        self.script_worker.line_txt.connect(self.callback_line_txt, type=Qt.DirectConnection)
+        self.script_worker.line_img.connect(self.callback_line_img, type=Qt.DirectConnection)
+        self.script_worker.send_serial.connect(self.callback_run_macro, type=Qt.DirectConnection)
+        # self.pushButton_PythonStop.pressed.connect(self.script_worker.stop, type=Qt.DirectConnection)
 
-        self.thread_2.started.connect(self.worker.run)
+        self.script_execution_thread.started.connect(self.script_worker.run, type=Qt.DirectConnection)
 
-        self.thread_2.finished.connect(self.worker.deleteLater)
-        self.thread_2.finished.connect(self.thread_2.deleteLater)
-        if self.worker is not None:
+        self.script_execution_thread.finished.connect(self.script_worker.deleteLater)
+        self.script_execution_thread.finished.connect(self.script_execution_thread.deleteLater)
+        if self.script_worker is not None:
             try:
-                self.worker.__post_init__()
-            except:
+                self.script_worker.__post_init__()
+            except Exception:
                 ...
-        self.thread_2.start()
+        self.script_execution_thread.start()
+        self.logger.debug("Command Started")
 
     @staticmethod
     def callback_start_command(self, is_alive: bool):
@@ -1208,24 +1277,29 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print(e)
         pass
 
-    def stop_command(self):
-        if self.thread_2 and shiboken6.isValid(self.thread_2):
-            self.logger.debug("Send Stop Requests.")
-            # self.stop_request.emit(True)
+    def stop_command(self, force_stop=False):
+        if self.script_execution_thread and shiboken6.isValid(self.script_execution_thread):
+            print(time.perf_counter())
+            if force_stop:
+                self.logger.debug("Send Stop Requests.")
+            self.stop_request.emit(True)
             # スレッドが作成されていて、削除されていない
-            if self.thread_2.isRunning() or not self.thread_2.isFinished():
+            if self.script_execution_thread.isRunning() or not self.script_execution_thread.isFinished():
+                self.script_stop_request = True
                 # self.worker.get_image.disconnect()
                 # print("thread is stopping")
-                self.worker.stop()
-                self.thread_2.quit()
-                self.thread_2.wait()
+                # self.script_worker.isCanceled = True
+                # self.pushButton_PythonStop.pressed.disconnect()
+                self.script_worker.stop()
+                self.script_execution_thread.quit()
+                self.script_execution_thread.wait()
                 # print("thread is stopped")
-                self.worker = None
-                self.thread_2 = None
+                self.script_worker = None
+                self.script_execution_thread = None
                 try:
                     self.GamepadController_worker.is_alive = True
                     self.GamepadController_worker.pause = False
-                except:
+                except Exception:
                     self.logger.error("ERROR")
                 # self.callback_stop_command()
 
@@ -1275,9 +1349,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.line_notify.send_text_n_image(img, s, token_key=token_key)
         ...
 
-    def callback_stop_command(self):
+    def callback_stop_command(self, force_stop: bool):
+        self.ser.writeRow("end")
         self.pushButton_PythonStart.setEnabled(True)
-        self.stop_command()
+        self.stop_command(force_stop)
         pass
 
     def open_python_commands_dir(self):
@@ -1292,7 +1367,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             match input_type:
                 case "press":
                     self.keyPress.input(buttons)
-                    self.wait(duration)
+                    self.wait(duration)  # 長い時間のsleepはguiをスタックさせるので、ここでやらないほうがよい
                     self.keyPress.inputEnd(buttons)
                     self.wait(wait)
                 case "hold":
@@ -1303,14 +1378,26 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 case _:
                     self.logger.error("Something seems to have gone wrong.\nPlease send info to the developer.")
 
-    @staticmethod
-    def wait(wait):
-        if float(wait) > 0.1:
-            time.sleep(wait)
-        else:
-            current_time = time.perf_counter()
-            while time.perf_counter() < current_time + wait:
-                pass
+    def wait(self, wait: float | int):
+        start_time = time.perf_counter()
+        time_left = wait
+        lap_start = start_time
+        while not self.script_stop_request:
+            # print(time_left)
+            if time_left > 0.1:
+                time.sleep(min(1, time_left))
+                time_left -= time.perf_counter() - lap_start
+                lap_start = time.perf_counter()
+            else:
+                current_time = time.perf_counter()
+                while time.perf_counter() < current_time + time_left:
+                    pass
+                break
+
+    def busy_wait(self, msec):
+        current_time = time.perf_counter()
+        while time.perf_counter() < current_time + msec:
+            pass
 
     def callback_return_img(self):
         self.capture_worker.callback_return_img(True)
@@ -1338,6 +1425,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                            v["state"]}
 
     def closeEvent(self, event: PySide6.QtGui.QCloseEvent) -> None:
+        self.ser.writeRow("end")
         # Windowが最大化されていたら記憶する
         if self.isMaximized():
             self.setting.setting["main_window"]["option"]["window_showMaximized"] = True
@@ -1348,10 +1436,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.setting.save()
         try:
-            if self.thread_1 is not None:
-                self.thread_1.terminate()
-            if self.thread_2 is not None:
-                self.thread_2.terminate()
+            if self.video_capture_thread is not None:
+                self.video_capture_thread.terminate()
+            if self.script_execution_thread is not None:
+                self.script_execution_thread.terminate()
             self.GamepadController_worker.p.terminate()
             self.GamepadController_worker.p.join()
         except Exception:
@@ -1378,10 +1466,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     @staticmethod
     def message_show_available_com_port():
         ls = serial_ports()
-        ret = QMessageBox.information(None,
+        ret = QMessageBox.information(QtWidgets.QWidget(),
                                       "利用可能なCOMポート",
                                       f"利用可能なCOMポートは\n{','.join(ls)}\nです。",
                                       QMessageBox.Ok)
+
+    @property
+    def script_alive(self) -> bool:
+        if self.script_worker is not None:
+            return True
+        else:
+            return False
+        # return False
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 import importlib
 import inspect
 import os
+import sys
 from glob import glob
 from os.path import join, relpath
 from logging import getLogger, DEBUG, NullHandler
@@ -41,7 +42,11 @@ def getModuleNames(base_path: str) -> list:
 def importAllModules(base_path: str, mod_names: str = None) -> list:
     modules = []
     for name in getModuleNames(base_path) if mod_names is None else mod_names:
-        logger.debug(f"Import module: {name}")
-        modules.append(importlib.import_module(name))
+        try:
+            logger.debug(f"Import module: {name}")
+            modules.append(importlib.import_module(name))
+        except ValueError as e:
+            print(f"Import module Error at {name}: {e} ", file=sys.stderr)
+            logger.exception(e)
 
     return modules

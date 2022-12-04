@@ -11,14 +11,14 @@ from typing import Optional
 import cv2
 import numpy
 import numpy as np
-from PySide6.QtCore import QObject, Signal, Slot
+from PySide6.QtCore import QObject, Signal, Slot, QTimer
 from PySide6.QtGui import QColor, QPainter
 
 from libs.keys import Button, Hat, Direction
 from concurrent.futures import ThreadPoolExecutor
 
 
-class StopSignal(Exception):
+class StopThread(Exception):
     pass
 
 
@@ -42,10 +42,12 @@ class CommandBase(QObject):
     TEMPLATE_PATH = "./template/"
     __directory__ = "./Commands/Python"
     __tool_tip__ = None
+    __key__ = None
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.src = None
+        self.wait_ret = None
+        self.__src = None
         self.isCanceled = False
         self.debug(f"コマンド実行Thread: {threading.get_ident()}")
         # print("init")
@@ -62,18 +64,20 @@ class CommandBase(QObject):
         # ここでdo()を行えばよいはず?
         try:
             self.do()
-        except StopSignal as e:
+            self.finish()
+        except StopThread as e:
             self.stop_function.emit(True)
-            self.info("Command finished successfully")
+            self.info("Command finished successfully", force=True)
         except Exception as e:
             # self.error(e)
             self.error(f"{e} エラーが発生しました", force=True)
             self.stop_function.emit(True)
-            # raise StopSignal
+            # raise StopThread
             pass
-        if self.isCanceled:
-            self.debug("Command Stopped.", force=True)
-        self.stop_function.emit(True)
+        # if self.isCanceled:
+        #     self.debug("Command Stopped.", force=True)
+        # self.info("Command finished successfully", force=True)
+        # self.stop_function.emit(False)
 
     @abstractmethod  # 抽象化：継承した際に定義必須
     def do(self):
@@ -91,40 +95,48 @@ class CommandBase(QObject):
 
     def finish(self):
         self.isCanceled = True
-        raise StopSignal
+        self.write_serial("end")
+        self.stop_function.emit(False)
+        raise StopThread
 
     def press(self,
               buttons: Button | Hat | Direction | list[Button | Hat | Direction],
               duration: float = 0.1,
-              wait: float = 0.1):
+              wait: float = 0.1,
+              repeat: int = 1):
         if not self.isCanceled:
-            self.serial_input.emit(buttons, duration, wait, "press")
+            s = time.time()
+            for _ in range(0, repeat):
+                self.serial_input.emit(buttons, duration, wait, "press")
+                self.debug(time.time() - s)
+                # self.wait(wait)
         else:
-            raise StopSignal
+            raise StopThread
 
     def pressRep(self, buttons: Button | Hat | Direction | list[Button | Hat | Direction],
-                 repeat: int, duration: float = 0.1, wait: float = 0.1, interval: float = 0.1):
+                 repeat: int, duration: float = 0.1, interval: float = 0.1, wait: float = 0.1):
         if not self.isCanceled:
-            for _ in range(repeat):
-                self.press(buttons, duration, wait)
-                self.wait(interval)
+            for _ in range(0, repeat):
+                self.press(buttons, duration, 0 if _ == repeat - 1 else interval)
+            self.wait(wait)
         else:
-            raise StopSignal
+            raise StopThread
 
     def hold(self, buttons: Button | Hat | Direction | list[Button | Hat | Direction],
              duration: float = 0.1):
         if not self.isCanceled:
-            self.serial_input.emit(buttons, duration, "hold")
+            self.serial_input.emit(buttons, duration, 0, "hold")
         else:
-            raise StopSignal
+            raise StopThread
 
     def holdEnd(self, buttons: Button | Hat | Direction | list[Button | Hat | Direction]):
         if not self.isCanceled:
-            self.serial_input.emit(buttons, "hold end")
+            self.serial_input.emit(buttons, 0, 0, "hold end")
         else:
-            raise StopSignal
+            raise StopThread
 
     def wait(self, wait: float):
+        self.wait_ret = False
         if float(wait) > 0.1 and not self.isCanceled:
             time.sleep(wait)
         else:
@@ -133,19 +145,26 @@ class CommandBase(QObject):
                 if not self.isCanceled:
                     pass
                 else:
-                    raise StopSignal
+                    raise StopThread
+
+    def end_timer(self):
+        self.wait_ret = True
 
     def check_if_alive(self) -> bool:
         if self.isCanceled:
             # raise exception for exit working thread
             self.info("Exit from command successfully")
             # self.stop_function.emit(True)
-            raise StopSignal("exit successfully")
+            raise StopThread("exit successfully")
         else:
             return True
 
     def write_serial(self, s: str):
         self.send_serial.emit(s)
+
+    def readFrame(self):
+        self.get_image.emit(True)
+        return self.__src
 
     def matching_image_in_the_template_listing(
             self,
@@ -197,7 +216,7 @@ class CommandBase(QObject):
             return {_path: {"score": max_val, "position": boxes}}
 
         self.get_image.emit(True)
-        src = cv2.cvtColor(self.src, cv2.COLOR_BGR2GRAY) if use_gray else self.src
+        src = cv2.cvtColor(self.__src, cv2.COLOR_BGR2GRAY) if use_gray else self.__src
         if trim is not None:
             src = src[trim[1]:trim[3], trim[0]:trim[2]]
 
@@ -233,7 +252,8 @@ class CommandBase(QObject):
             show_only_true_rect: bool = True,
             show_rect_frame: int = 120,
             color: QColor = QColor(255, 0, 0, 127),
-            trim: Optional[list[int, int, int, int]] = None
+            trim: Optional[list[int, int, int, int]] = None,
+            show_template_name: str = ""
     ) -> bool:
         """
 
@@ -247,12 +267,13 @@ class CommandBase(QObject):
             show_rect_frame: 枠を表示
             color: QColor, 枠の色
             trim: left_up_x, left_up_y, right_down_x, right_down_y
+            show_template_name: 画像認識させる画像の名前を表示
 
         Returns:
 
         """
         self.get_image.emit(True)
-        src = cv2.cvtColor(self.src, cv2.COLOR_BGR2GRAY) if use_gray else self.src
+        src = cv2.cvtColor(self.__src, cv2.COLOR_BGR2GRAY) if use_gray else self.__src
         if trim is not None:
             src = src[trim[1]:trim[3], trim[0]:trim[2]]
         template = cv2.imread(
@@ -375,13 +396,13 @@ class CommandBase(QObject):
 
     @Slot(numpy.ndarray)
     def callback_receive_img(self, frame):
-        self.src = frame
+        self.__src = frame
 
     def screenshot(self):
         try:
             self.get_image.emit(True)
             self.imwrite(
-                pathlib.Path(self.CAPTURE_DIR) / f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.png", self.src
+                pathlib.Path(self.CAPTURE_DIR) / f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.png", self.__src
             )
             print("capture succeeded:")
             pass
@@ -420,7 +441,7 @@ class CommandBase(QObject):
             self.line_txt.emit(txt, token_key)
         else:
             self.get_image.emit(True)
-            self.line_img.emit(txt, token_key, self.src)
+            self.line_img.emit(txt, token_key, self.__src)
 
     @staticmethod
     def imwrite(filename: str, img, params=None) -> bool:
