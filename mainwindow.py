@@ -1095,7 +1095,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # 表示しているタブを読み取って、どのコマンドを表示しているか取得、リロード後もそれが選択されるようにする
         oldval_mcu = self.comboBox_MCU.itemText(self.comboBox_MCU.currentIndex())
         oldval_py = self.comboBoxPython.itemText(self.comboBoxPython.currentIndex())
-        print(oldval_mcu)
+        # print(oldval_mcu)
 
         self.comboBox_MCU.clear()
         self.comboBoxPython.clear()
@@ -1200,9 +1200,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def callback_start_command(self, is_alive: bool):
         try:
             if is_alive:
-                print("ALIVE")
+                # print("ALIVE")
+                pass
             else:
-                print("DEAD")
+                # print("DEAD")
+                pass
 
         except Exception as e:
             print(e)
