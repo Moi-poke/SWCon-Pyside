@@ -1,5 +1,8 @@
 # Description
-[Poke-Controller](https://github.com/KawaSwitch/Poke-Controller)をベースにPySide6で主要機能を再構築
+[Poke-Controller](https://github.com/KawaSwitch/Poke-Controller)をベースにPySide6で主要機能を再構築しています
+
+
+![image](https://user-images.githubusercontent.com/59233665/204475385-c8cacfe3-5b35-49ed-b77b-cde447c9be91.png)
 
 
 # Requirements
@@ -55,5 +58,3 @@ This repository is mainly licensed under the [GNU LGPL v3](http://github.com/IQA
 ### 免責事項
 このプログラム、および同梱のファイルの使用、または使用不具合等により生じたいかなる損害に関しまして、作者は一切責任を負いません。
 
-#### お布施
-https://ofuse.me/moi0326
