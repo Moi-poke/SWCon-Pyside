@@ -264,7 +264,7 @@ class Direction:
         else:
             return False
 
-    def getTilting(self)->list:
+    def getTilting(self) -> list:
         tilting = []
         if self.stick == Stick.LEFT:
             if self.x < center:
@@ -337,7 +337,7 @@ class KeyPress:
         self.inputEnd_time_0 = time.perf_counter()
         self.was_neutral = True
 
-    def input(self, btns, ifPrint:bool=True):
+    def input(self, btns, overwrite: bool = False, ifPrint: bool = True):
         self._pushing = dict(self.format.format)
         if not isinstance(btns, list):
             btns = [btns]
@@ -345,13 +345,17 @@ class KeyPress:
         for btn in self.holdButton:
             if btn not in btns:
                 btns.append(btn)
-
+        if overwrite:
+            self.format.resetAllButtons()
+            self.format.unsetHat()
+            self.format.resetAllDirections()
         self.format.setButton([btn for btn in btns if type(btn) is Button])
         self.format.setHat([btn for btn in btns if type(btn) is Hat])
         self.format.setAnyDirection([btn for btn in btns if type(btn) is Direction])
 
+        # print(self.format.convert2str())
         self.ser.writeRow(self.format.convert2str())
-        self.input_time_0 = time.perf_counter()
+        # self.input_time_0 = time.perf_counter()
 
         # self._logger.debug(f": {list(map(str,self.format.format.values()))}")
 
