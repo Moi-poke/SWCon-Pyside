@@ -67,6 +67,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.is_show_serial = False
         self.keyPress = None
         self.keymap = None
+        self.mcu_cur_command = None
+        self.py_cur_command = None
+        self.cur_command = None
+        # コマンドをロードするインスタンス用の変数初期化
+        self.py_loader = None
+        self.mcu_loader = None
+        self.py_classes = None
+        self.mcu_classes = None
+
         self.gui_l_stick = 0
         self.gui_r_stick = 0
 
@@ -243,20 +252,23 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.logger.error(e)
 
     def stickMoveEvent(self, left_horizontal, left_vertical, right_horizontal, right_vertical):
-        dead_zone = 0.05  # これ以下の傾きは無視(デッドゾーン)
-        left_angle = math.atan2(left_vertical, left_horizontal)
-        left_r = math.sqrt(left_vertical ** 2 + left_horizontal ** 2)
-        right_angle = math.atan2(right_vertical, right_horizontal)
-        right_r = math.sqrt(right_vertical ** 2 + right_horizontal ** 2)
+        try:
+            dead_zone = 0.05  # これ以下の傾きは無視(デッドゾーン)
+            left_angle = math.atan2(left_vertical, left_horizontal)
+            left_r = math.sqrt(left_vertical ** 2 + left_horizontal ** 2)
+            right_angle = math.atan2(right_vertical, right_horizontal)
+            right_r = math.sqrt(right_vertical ** 2 + right_horizontal ** 2)
 
-        # print(left_r, right_r)
-        if left_r < dead_zone:
-            left_r = 0
-        if right_r < dead_zone:
-            right_r = 0
+            # print(left_r, right_r)
+            if left_r < dead_zone:
+                left_r = 0
+            if right_r < dead_zone:
+                right_r = 0
 
-        self.left_stick.stickMoveEvent(left_r, left_angle)
-        self.right_stick.stickMoveEvent(right_r, right_angle)
+            self.left_stick.stickMoveEvent(left_r, left_angle)
+            self.right_stick.stickMoveEvent(right_r, right_angle)
+        except KeyboardInterrupt:
+            self.close()
 
     def reconnect_gamepad(self):
         self.GamepadController_worker.connect_joystick()
@@ -970,7 +982,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.comboBox_MCU.currentIndexChanged.connect(self.assign_command)
 
         # キャプチャ画像クリック時に座標を返すように
-        self.CaptureImageArea.mousePressEvent = self.capture_mousePressEvent
+        self.CaptureImageArea.mousePressEvent = self.capture_mouse_press_event
 
         # Setting.tomlへの保存
         self.lineEditFPS.textChanged.connect(self.assign_fps_to_setting)
@@ -1014,10 +1026,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     @Slot(QImage)
     def update_image(self, image):
-        self.img = image
-        pix = QPixmap.fromImage(self.img)
-        # pix.scaled(1280, 720, aspectMode=QtCore.Qt.KeepAspectRatio)
-        self.CaptureImageArea.setPixmap(pix)
+        try:
+            self.img = image
+            pix = QPixmap.fromImage(self.img)
+            # pix.scaled(1280, 720, aspectMode=QtCore.Qt.KeepAspectRatio)
+            self.CaptureImageArea.setPixmap(pix)
+        except KeyboardInterrupt:
+            self.close()
+            # pass
 
     @Slot(str)
     def update_log(self, s):
@@ -1061,30 +1077,44 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def load_commands(self):
         self.py_loader = CommandLoader(ospath("Commands/Python"), CommandBase)  # コマンドの読み込み
         self.mcu_loader = CommandLoader(ospath("Commands/MCU"), McuCommand)
-        self.py_classes = self.py_loader.load()
-        self.mcu_classes = self.mcu_loader.load()
+        self.py_classes, py_error = self.py_loader.load()
+        self.mcu_classes, mcu_error = self.mcu_loader.load()
+        if py_error is not []:
+            for k, v in py_error.items():
+                self.logger.error(f"Error while loading {k}\n"
+                                  # f">>> {(v[0])}\n"
+                                  f">>> {(v[1])}"
+                                  # f">>> {(v[2])}\n"
+                                  )
+        if mcu_error is not []:
+            for k, v in mcu_error.items():
+                self.logger.error(f"Error while loading {k}\n"
+                                  # f">>> {(v[0])}\n"
+                                  f">>> {(v[1])}"
+                                  # f">>> {(v[2])}\n"
+                                  )
+
         # print(self.mcu_classes)
         self.set_command_items()
         self.assign_command()
 
     def set_command_items(self):
-        i = 0
-        for v in [c.NAME for c in self.py_classes]:
+        for idx, v in enumerate([c[0].NAME for c in self.py_classes]):
             self.comboBoxPython.addItem(v)
-            if (s := self.py_classes[i]().__tool_tip__) is not None:
-                self.comboBoxPython.setItemData(i, s, QtCore.Qt.ToolTipRole)
-            i += 1
+            if (s := self.py_classes[idx][0]().__tool_tip__) is not None:
+                self.comboBoxPython.setItemData(idx, s, QtCore.Qt.ToolTipRole)
+                self.comboBoxPython.setItemData(idx, QColor(255, 0, 0), QtCore.Qt.ItemDataRole.ForegroundRole)
         s = None
         self.comboBoxPython.setCurrentIndex(0)
-        for v in [c.NAME for c in self.mcu_classes]:
+        for v in [c[0].NAME for c in self.mcu_classes]:
             self.comboBox_MCU.addItem(v)
         self.comboBox_MCU.setCurrentIndex(0)
 
     def assign_command(self):
         # 選択されているコマンドを取得する
-        self.mcu_cur_command = self.mcu_classes[self.comboBox_MCU.currentIndex()]  # MCUコマンドについて
+        self.mcu_cur_command = self.mcu_classes[self.comboBox_MCU.currentIndex()][0] # MCUコマンドについて
 
-        self.py_cur_command = self.py_classes[self.comboBoxPython.currentIndex()]
+        self.py_cur_command = self.py_classes[self.comboBoxPython.currentIndex()][0]
 
         if self.tabWidget.currentIndex() == 0:
             self.cur_command = self.py_cur_command
@@ -1093,29 +1123,46 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def reload_commands(self):
         # 表示しているタブを読み取って、どのコマンドを表示しているか取得、リロード後もそれが選択されるようにする
-        oldval_mcu = self.comboBox_MCU.itemText(self.comboBox_MCU.currentIndex())
-        oldval_py = self.comboBoxPython.itemText(self.comboBoxPython.currentIndex())
-        # print(oldval_mcu)
+        old_val_mcu = self.comboBox_MCU.itemText(self.comboBox_MCU.currentIndex())
+        old_val_py = self.comboBoxPython.itemText(self.comboBoxPython.currentIndex())
+        # print(old_val_mcu)
 
         self.comboBox_MCU.clear()
         self.comboBoxPython.clear()
 
-        self.py_classes = self.py_loader.reload()
-        self.mcu_classes = self.mcu_loader.reload()
+        self.py_classes, py_reload_error = self.py_loader.reload()
+        self.mcu_classes, mcu_reload_error = self.mcu_loader.reload()
 
         # Restore the command selecting state if possible
         self.set_command_items()
-        if self.comboBox_MCU.findText(oldval_mcu) != -1:
-            self.comboBox_MCU.setCurrentIndex(self.comboBox_MCU.findText(oldval_mcu))
+        if self.comboBox_MCU.findText(old_val_mcu) != -1:
+            self.comboBox_MCU.setCurrentIndex(self.comboBox_MCU.findText(old_val_mcu))
         else:
             self.comboBox_MCU.setCurrentIndex(0)
 
-        if self.comboBoxPython.findText(oldval_py) != -1:
-            self.comboBoxPython.setCurrentIndex(self.comboBoxPython.findText(oldval_py))
+        if self.comboBoxPython.findText(old_val_py) != -1:
+            self.comboBoxPython.setCurrentIndex(self.comboBoxPython.findText(old_val_py))
         else:
             self.comboBoxPython.setCurrentIndex(0)
         self.assign_command()
-        self.logger.info("Reloaded commands.")
+        if py_reload_error is {} and mcu_reload_error is {}:
+            self.logger.info("Reloaded commands.")
+        elif py_reload_error:
+            for k, v in py_reload_error.items():
+                # k, v = s.items()
+                # print(v[0])
+                self.logger.error(f"Error while loading {k}\n"
+                                  # f">>> {(v[0])}\n"
+                                  f">>> {(v[1])}"
+                                  # f">>> {(v[2])}\n"
+                                  )
+        elif mcu_reload_error:
+            for k, v in mcu_reload_error.items():
+                self.logger.error(f"Error while loading {k}\n"
+                                  # f">>> {(v[0])}\n"
+                                  f">>> {(v[1])}"
+                                  # f">>> {(v[2])}\n"
+                                  )
 
     def reload_camera(self):
         self.capture_worker.set_fps(self.setting.setting["main_window"]["must"]["fps"])
@@ -1138,7 +1185,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.ser.is_show_serial = False
         pass
 
-    def capture_mousePressEvent(self, event):
+    def capture_mouse_press_event(self, event):
         if event.modifiers() & QtCore.Qt.ControlModifier:  # Ctrlキーが押されているなら
             w = self.CaptureImageArea.width()
             h = self.CaptureImageArea.height()
@@ -1279,6 +1326,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def callback_stop_command(self):
         self.pushButton_PythonStart.setEnabled(True)
+        self.ser.writeRow("end")
         self.stop_command()
         pass
 
@@ -1297,11 +1345,22 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     self.wait(duration)
                     self.keyPress.inputEnd(buttons)
                     self.wait(wait)
+                case "press_w/o_wait":
+                    self.keyPress.input(buttons, overwrite=True)
+                    self.wait(duration)
                 case "hold":
                     self.keyPress.hold(buttons)
                     self.wait(duration)
                 case "hold end":
                     self.keyPress.holdEnd(buttons)
+                case "release":
+                    self.keyPress.inputEnd(buttons)
+                case "release_all":
+                    # self.ser.writeRow("3 8 80 80 80 80")
+                    self.keyPress.format.resetAllButtons()
+                    self.keyPress.format.unsetHat()
+                    self.keyPress.format.resetAllDirections()
+                    self.keyPress.input([])
                 case _:
                     self.logger.error("Something seems to have gone wrong.\nPlease send info to the developer.")
 
