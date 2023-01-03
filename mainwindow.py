@@ -33,7 +33,7 @@ from ui.main_ui import Ui_MainWindow
 from ui.QtextLogger import QPlainTextEditLogger
 from libs.LineNotify import LineNotify
 
-VERSION = "0.7.2 (beta)"
+VERSION = "0.7.3 (beta)"
 Author = "Moi"
 
 
