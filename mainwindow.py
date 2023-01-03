@@ -33,7 +33,7 @@ from ui.main_ui import Ui_MainWindow
 from ui.QtextLogger import QPlainTextEditLogger
 from libs.LineNotify import LineNotify
 
-VERSION = "0.7.3 (beta)"
+VERSION = "0.7.4 (beta)"
 Author = "Moi"
 
 
@@ -1054,7 +1054,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def activate_serial(self):
         try:
             if self.ser.isOpened():
-                print("Port is already opened and being closed.")
+                self.logger.debug("Port is already opened and being closed.")
                 self.ser.closeSerial()
                 self.keyPress = None
                 self.activate_serial()
@@ -1066,6 +1066,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                         + " connected successfully"
                     )
                     self.keyPress = KeyPress(self.ser)
+                else:
+                    self.logger.error(f'Cannot open COM Port: {self.setting.setting["main_window"]["must"]["com_port"]}')
+
         except:
             self.logger.debug("Input Correct COM Port and Reload!")
         pass
