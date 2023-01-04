@@ -3,6 +3,7 @@ import os
 import sys
 import threading
 import time
+import collections
 from multiprocessing import Array, Process, shared_memory
 from os import environ
 
@@ -478,6 +479,7 @@ class GamepadController(QObject):
         self.logger.addHandler(StreamHandler())
         self.logger.setLevel(DEBUG)
         self.logger.propagate = True
+        self.joystick_: (None, pygame.joystick.Joystick) = None
         self.use_Rstick = None
         self.use_Lstick = None
         self.is_alive = True
@@ -485,6 +487,8 @@ class GamepadController(QObject):
         self.pause = False
         self.p = None
         self.isCanceled = False
+        self.send_err = False
+        self.no_joystick = True
         pygame.init()
         self.connect_joystick()
 
@@ -497,18 +501,23 @@ class GamepadController(QObject):
         self.stick = np.ndarray(self._stick.shape, dtype=self._stick.dtype, buffer=self.shm.buf)
 
     def connect_joystick(self):
-        self.debug("Connect Joystick")
+        self.debug("Connecting Joystick...")
         try:
             pygame.joystick.init()
             self.joystick_ = pygame.joystick.Joystick(0)
             self.joystick_.init()
-            self.debug("Connected")
+            self.debug("Successfully connected")
             self.no_joystick = False
             self.reconnect_subprocess()
+            self.stick[0][0] = 0
+            self.stick[1][0] = 0
+            self.stick[2][0] = 0
+            self.stick[3][0] = 0
             return True
-        except:
+        except Exception:
+            # print(Exception)
             self.no_joystick = True
-            self.debug("No joystick")
+            self.debug("Connection Failed")
             return False
 
     def reconnect_subprocess(self):
@@ -518,6 +527,7 @@ class GamepadController(QObject):
             self.p = None
         self.p = Process(target=j_stick)
         self.p.start()
+        self.send_err = False
 
     def set_keymap(self, keymap):
         self.keymap = keymap
@@ -537,20 +547,30 @@ class GamepadController(QObject):
             pass
         # while self.is_alive:
         while True:
-            if self.pause is True or self.no_joystick is True:
+            if self.pause is True or self.no_joystick:
                 time.sleep(1.0)
+                if self.no_joystick:
+                    try:
+                        for e in pygame.event.get():
+                            if e.type == pygame.JOYDEVICEADDED:
+                                self.info("コントローラが接続されました。")
+                                while self.no_joystick:
+                                    self.connect_joystick()
+                    except:
+                        pass
                 continue
             # print(f"running {threading.get_ident()}")
             start = time.perf_counter()
-
             try:
+                if self.p is None or not self.p.is_alive():
+                    time.sleep(max(1 / 10 - (time.perf_counter() - start), 0.0001))
+                    if self.send_err is False:
+                        self.warning("コントローラとの接続が切断されました。")
+                        self.send_err = True
+                        self.no_joystick = True
+                        # print("NNN")
+                        continue
                 if self.use_Lstick and self.use_Rstick:
-                    # self.AXIS_MOVED.emit(
-                    #     self.joystick_.get_axis(0),  # left horizontal
-                    #     self.joystick_.get_axis(1),  # left vertical
-                    #     self.joystick_.get_axis(2),  # right horizontal
-                    #     self.joystick_.get_axis(3),  # right vertical
-                    # )
                     self.AXIS_MOVED.emit(
                         self.stick[0][0],  # left horizontal
                         self.stick[1][0],  # left vertical
@@ -558,12 +578,6 @@ class GamepadController(QObject):
                         self.stick[3][0],  # right vertical
                     )
                 elif self.use_Lstick:
-                    # self.AXIS_MOVED.emit(
-                    #     self.joystick_.get_axis(0),  # left horizontal
-                    #     self.joystick_.get_axis(1),  # left vertical
-                    #     0,
-                    #     0,
-                    # )
                     self.AXIS_MOVED.emit(
                         self.stick[0][0],  # left horizontal
                         self.stick[1][0],  # left vertical
@@ -571,12 +585,6 @@ class GamepadController(QObject):
                         0,
                     )
                 elif self.use_Rstick:
-                    # self.AXIS_MOVED.emit(
-                    #     0,
-                    #     0,
-                    #     self.joystick_.get_axis(2),  # right horizontal
-                    #     self.joystick_.get_axis(3),  # right vertical
-                    # )
                     self.AXIS_MOVED.emit(
                         0,
                         0,
@@ -769,12 +777,20 @@ class GamepadController(QObject):
                         pass
             except RuntimeError:
                 pass
+            except ValueError:
+                pass
+            except Exception:
+                print(Exception)
 
             time.sleep(max(1 / 60 - (time.perf_counter() - start), 0.0001))
 
-        print("DEAD")
-        self.p.close()
-        self.p.kill()
+        try:
+            self.p.close()
+            self.p.kill()
+        except ValueError:
+            pass
+        except Exception:
+            print(Exception)
 
     def check(self):
         print(self.is_alive)
@@ -823,21 +839,44 @@ def j_stick():
     logger.propagate = True
     logger.debug(f"スティック情報取得プロセスID: {os.getpid()}")
 
-    pygame.init()
-    pygame.joystick.init()
-    joystick = pygame.joystick.Joystick(0)
-
     stick_shm = shared_memory.SharedMemory(name="stick")  # 共有メモリを取得
     stick = np.ndarray((4, 1), dtype=np.float64, buffer=stick_shm.buf)
-
+    num_queue = 3
+    queue_0 = collections.deque([], num_queue)
+    queue_1 = collections.deque([], num_queue)
+    queue_2 = collections.deque([], num_queue)
+    queue_3 = collections.deque([], num_queue)
+    initialized = False
     try:
         while True:
+            try:
+                if not initialized:
+                    pygame.init()
+                    pygame.joystick.init()
+                    joystick = pygame.joystick.Joystick(0)
+                    initialized = True
+            except pygame.error as e:
+                # print(e)
+                pass
+            except Exception:
+                continue
+
             for e in pygame.event.get():
                 if e.type == pygame.locals.JOYAXISMOTION:
-                    stick[0] = joystick.get_axis(0)  # left horizontal
-                    stick[1] = joystick.get_axis(1)  # left vertical
-                    stick[2] = joystick.get_axis(2)  # right horizontal
-                    stick[3] = joystick.get_axis(3)  # right vertical
+                    queue_0.append(joystick.get_axis(0))
+                    queue_1.append(joystick.get_axis(1))
+                    queue_2.append(joystick.get_axis(2))
+                    queue_3.append(joystick.get_axis(3))
+                    stick[0] = sum(queue_0) / num_queue  # left horizontal
+                    stick[1] = sum(queue_1) / num_queue  # left vertical
+                    stick[2] = sum(queue_2) / num_queue  # right horizontal
+                    stick[3] = sum(queue_3) / num_queue  # right vertical
+                elif e.type == pygame.JOYDEVICEREMOVED:
+                    stick[0] = 0  # left horizontal スティックの位置を初期位置に戻す
+                    stick[1] = 0  # left vertical
+                    stick[2] = 0  # right horizontal
+                    stick[3] = 0  # right vertical
+                    return False
     except KeyboardInterrupt:
         pass
 

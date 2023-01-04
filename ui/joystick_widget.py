@@ -37,13 +37,16 @@ class Joystick(QtWidgets.QWidget):
         self.distance = 0
 
     def paintEvent(self, event):
-        painter = QPainter(self)
-        bounds = QRectF(
-            -self.__maxDistance, -self.__maxDistance, self.__maxDistance * 2, self.__maxDistance * 2
-        ).translated(self._center())
-        painter.drawEllipse(bounds)
-        painter.setBrush(QColor(65, 69, 72))
-        painter.drawEllipse(self._centerEllipse())
+        try:
+            painter = QPainter(self)
+            bounds = QRectF(
+                -self.__maxDistance, -self.__maxDistance, self.__maxDistance * 2, self.__maxDistance * 2
+            ).translated(self._center())
+            painter.drawEllipse(bounds)
+            painter.setBrush(QColor(65, 69, 72))
+            painter.drawEllipse(self._centerEllipse())
+        except:
+            return
 
     def _centerEllipse(self):
         if self.grabCenter or self.gamepadControl:
