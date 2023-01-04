@@ -253,17 +253,25 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def stickMoveEvent(self, left_horizontal, left_vertical, right_horizontal, right_vertical):
         try:
-            dead_zone = 0.05  # これ以下の傾きは無視(デッドゾーン)
             left_angle = math.atan2(left_vertical, left_horizontal)
             left_r = math.sqrt(left_vertical ** 2 + left_horizontal ** 2)
             right_angle = math.atan2(right_vertical, right_horizontal)
             right_r = math.sqrt(right_vertical ** 2 + right_horizontal ** 2)
 
             # print(left_r, right_r)
+            dead_zone = 0.35  # これ以下の傾きは無視(デッドゾーン)
             if left_r < dead_zone:
                 left_r = 0
+            else:
+                left_r -= dead_zone
+                left_r /= (1-dead_zone)
+                ...
             if right_r < dead_zone:
                 right_r = 0
+            else:
+                right_r -= dead_zone
+                right_r /= (1-dead_zone)
+                ...
 
             self.left_stick.stickMoveEvent(left_r, left_angle)
             self.right_stick.stickMoveEvent(right_r, right_angle)
@@ -838,17 +846,25 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.keyPress.inputEnd(Button.HOME)
 
     def stick_control(self, left_horizontal, left_vertical, right_horizontal, right_vertical):
-        dead_zone = 0.05  # これ以下の傾きは無視(デッドゾーン)
         left_angle = -math.degrees(math.atan2(left_vertical, left_horizontal))
         left_r = math.sqrt(left_vertical ** 2 + left_horizontal ** 2)
         right_angle = -math.degrees(math.atan2(right_vertical, right_horizontal))
         right_r = math.sqrt(right_vertical ** 2 + right_horizontal ** 2)
 
         # print(left_r, right_r)
+        dead_zone = 0.35  # これ以下の傾きは無視(デッドゾーン)
         if left_r < dead_zone:
             left_r = 0
+        else:
+            left_r -= dead_zone
+            left_r /= (1-dead_zone)
+            ...
         if right_r < dead_zone:
             right_r = 0
+        else:
+            right_r -= dead_zone
+            right_r /= (1-dead_zone)
+            ...
 
         # print(left_angle, left_r)
         # if self.bef_left_r is None or (left_r != 0 and self.bef_left_r != left_r) or (
@@ -1067,7 +1083,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     )
                     self.keyPress = KeyPress(self.ser)
                 else:
-                    self.logger.error(f'Cannot open COM Port: {self.setting.setting["main_window"]["must"]["com_port"]}')
+                    self.logger.error(
+                        f'Cannot open COM Port: {self.setting.setting["main_window"]["must"]["com_port"]}')
 
         except:
             self.logger.debug("Input Correct COM Port and Reload!")
@@ -1115,7 +1132,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def assign_command(self):
         # 選択されているコマンドを取得する
-        self.mcu_cur_command = self.mcu_classes[self.comboBox_MCU.currentIndex()][0] # MCUコマンドについて
+        self.mcu_cur_command = self.mcu_classes[self.comboBox_MCU.currentIndex()][0]  # MCUコマンドについて
 
         self.py_cur_command = self.py_classes[self.comboBoxPython.currentIndex()][0]
 
@@ -1186,6 +1203,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         else:
             self.setting.setting["main_window"]["option"]["show_serial"] = False
             self.ser.is_show_serial = False
+        pass
+
+    def pause_controller(self):
+        if self.actionPauseController.isChecked():
+            # self.setting.setting["main_window"]["option"]["pause_controller"] = True
+            self.logger.info("コントローラ入力を一時停止します")
+            self.GamepadController_worker.pause = True
+        else:
+            # self.setting.setting["main_window"]["option"]["pause_controller"] = False
+            self.logger.info("コントローラ入力を再開します")
+            self.GamepadController_worker.pause = False
         pass
 
     def capture_mouse_press_event(self, event):

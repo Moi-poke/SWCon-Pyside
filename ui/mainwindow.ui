@@ -637,6 +637,7 @@
      </property>
      <addaction name="actionconnect"/>
      <addaction name="actionsetting"/>
+     <addaction name="actionPauseController"/>
     </widget>
     <addaction name="menuGUI_Controller_2"/>
     <addaction name="menuGamepad_Controller"/>
@@ -2087,6 +2088,14 @@
     <string>利用可能なCOM Port取得</string>
    </property>
   </action>
+  <action name="actionPauseController">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>一時停止</string>
+   </property>
+  </action>
  </widget>
  <customwidgets>
   <customwidget>
@@ -2204,6 +2213,22 @@
     </hint>
    </hints>
   </connection>
+  <connection>
+   <sender>actionPauseController</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>MainWindow</receiver>
+   <slot>pause_controller()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>517</x>
+     <y>398</y>
+    </hint>
+   </hints>
+  </connection>
  </connections>
  <slots>
   <slot>reloadCamera()</slot>
@@ -2215,5 +2240,6 @@
   <slot>openPythonCommandsDir()</slot>
   <slot>openMCUCommandsDir()</slot>
   <slot>show_serial()</slot>
+  <slot>pause_controller()</slot>
  </slots>
 </ui>

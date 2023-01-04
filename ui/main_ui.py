@@ -93,6 +93,9 @@ class Ui_MainWindow(object):
         self.actionsetting.setEnabled(False)
         self.actionCOM_Port_ASSIST = QAction(MainWindow)
         self.actionCOM_Port_ASSIST.setObjectName(u"actionCOM_Port_ASSIST")
+        self.actionPauseController = QAction(MainWindow)
+        self.actionPauseController.setObjectName(u"actionPauseController")
+        self.actionPauseController.setCheckable(True)
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
         self.centralwidget.setAutoFillBackground(False)
@@ -865,6 +868,7 @@ class Ui_MainWindow(object):
         self.menuGUI_Controller_2.addAction(self.actionGuiSetting)
         self.menuGamepad_Controller.addAction(self.actionconnect)
         self.menuGamepad_Controller.addAction(self.actionsetting)
+        self.menuGamepad_Controller.addAction(self.actionPauseController)
         self.menuWindow.addAction(self.actionLog_Window)
 
         self.retranslateUi(MainWindow)
@@ -873,6 +877,7 @@ class Ui_MainWindow(object):
         self.actionGuiControllerOpen.triggered.connect(self.dockWidget_left.showNormal)
         self.actionGuiControllerOpen.triggered.connect(self.dockWidget_right.showNormal)
         self.actionShow_Serial.triggered["bool"].connect(MainWindow.show_serial)
+        self.actionPauseController.toggled.connect(MainWindow.pause_controller)
 
         self.tabWidget.setCurrentIndex(0)
         self.pushButton_PythonReload.setDefault(False)
@@ -903,6 +908,7 @@ class Ui_MainWindow(object):
         self.actionconnect.setText(QCoreApplication.translate("MainWindow", u"\u63a5\u7d9a", None))
         self.actionsetting.setText(QCoreApplication.translate("MainWindow", u"\u8a2d\u5b9a(\u5b9f\u88c5\u4e2d)", None))
         self.actionCOM_Port_ASSIST.setText(QCoreApplication.translate("MainWindow", u"\u5229\u7528\u53ef\u80fd\u306aCOM Port\u53d6\u5f97", None))
+        self.actionPauseController.setText(QCoreApplication.translate("MainWindow", u"\u4e00\u6642\u505c\u6b62", None))
         self.CaptureImageArea.setText(QCoreApplication.translate("MainWindow", u"CaptureImage", None))
         self.toolButtonOpenPythonDir.setText(QCoreApplication.translate("MainWindow", u"...", None))
         self.pushButton_PythonReload.setText(QCoreApplication.translate("MainWindow", u"Reload", None))
