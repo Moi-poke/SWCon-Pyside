@@ -1,3 +1,4 @@
+import copy
 import logging
 import math
 import os
@@ -29,6 +30,7 @@ from libs.keys import Button, Direction, Hat, KeyPress, Stick
 from libs.mcu_command_base import McuCommand
 from libs.settings import Setting
 from libs.Utility import ospath
+from libs.template_match_support import TemplateMatchSupport
 from ui.main_ui import Ui_MainWindow
 from ui.QtextLogger import QPlainTextEditLogger
 from libs.LineNotify import LineNotify
@@ -70,6 +72,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.mcu_cur_command = None
         self.py_cur_command = None
         self.cur_command = None
+        self.template_matching_support_tool = None
         # コマンドをロードするインスタンス用の変数初期化
         self.py_loader = None
         self.mcu_loader = None
@@ -264,13 +267,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 left_r = 0
             else:
                 left_r -= dead_zone
-                left_r /= (1-dead_zone)
+                left_r /= (1 - dead_zone)
                 ...
             if right_r < dead_zone:
                 right_r = 0
             else:
                 right_r -= dead_zone
-                right_r /= (1-dead_zone)
+                right_r /= (1 - dead_zone)
                 ...
 
             self.left_stick.stickMoveEvent(left_r, left_angle)
@@ -857,13 +860,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             left_r = 0
         else:
             left_r -= dead_zone
-            left_r /= (1-dead_zone)
+            left_r /= (1 - dead_zone)
             ...
         if right_r < dead_zone:
             right_r = 0
         else:
             right_r -= dead_zone
-            right_r /= (1-dead_zone)
+            right_r /= (1 - dead_zone)
             ...
 
         # print(left_angle, left_r)
@@ -1009,6 +1012,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.actionconnect.triggered.connect(self.reconnect_gamepad)
         self.actionCOM_Port_ASSIST.triggered.connect(self.message_show_available_com_port)
+        # self.actionTemplateMatchSupport.triggered.connect(self.open_template_matching_support_tool)
 
     def assign_fps_to_setting(self):
         self.setting.setting["main_window"]["must"]["fps"] = self.lineEditFPS.text()
@@ -1040,10 +1044,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         else:
             raise Exception
 
-    @Slot(QImage)
-    def update_image(self, image):
+    @Slot(QImage, np.ndarray)
+    def update_image(self, image, frame):
         try:
             self.img = image
+            self.frame = frame
             pix = QPixmap.fromImage(self.img)
             # pix.scaled(1280, 720, aspectMode=QtCore.Qt.KeepAspectRatio)
             self.CaptureImageArea.setPixmap(pix)
@@ -1240,7 +1245,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         os.startfile(os.path.realpath(self.cur_command.__directory__))
 
     def start_command(self):
-        self.GamepadController_worker.pause = True
+        if self.GamepadController_worker is not None:
+            self.GamepadController_worker.pause = True
         self.assign_command()
         self.pushButton_PythonStart.setEnabled(False)
         # if self.thread_2 is not None:
@@ -1439,6 +1445,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.setting.setting["command"]["mcu_command"] = self.comboBox_MCU.currentText()
 
         self.setting.save()
+        if self.template_matching_support_tool is not None:
+            self.template_matching_support_tool.close()
+
         try:
             if self.thread_1 is not None:
                 self.thread_1.terminate()
@@ -1474,6 +1483,27 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                                       "利用可能なCOMポート",
                                       f"利用可能なCOMポートは\n{','.join(ls)}\nです。",
                                       QMessageBox.Ok)
+
+    def open_template_matching_support_tool(self):
+        self.logger.debug("テンプレートマッチ補助ツール")
+        if self.template_matching_support_tool is None:
+            self.template_matching_support_tool = TemplateMatchSupport()
+            self.template_matching_support_tool.get_image.connect(self.callback_set_template_matching_support_tool)
+            self.template_matching_support_tool.graphicsView.template_matching.connect(self.callback_template_matching)
+            self.template_matching_support_tool.print_strings.connect(self.callback_string_to_log,
+                                                                      type=Qt.QueuedConnection)
+        self.template_matching_support_tool.show()
+
+    @Slot()
+    def callback_set_template_matching_support_tool(self):
+        if self.template_matching_support_tool is not None:
+            self.template_matching_support_tool.image = copy.deepcopy(self.frame)
+            self.logger.debug("Set Image to tool.")
+
+    @Slot()
+    def callback_template_matching(self):
+        if self.template_matching_support_tool is not None:
+            self.template_matching_support_tool.create_scene(get_img=False)
 
 
 if __name__ == "__main__":

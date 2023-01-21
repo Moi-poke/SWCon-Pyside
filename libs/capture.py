@@ -16,32 +16,31 @@ from PySide6.QtGui import QImage, QColor, QPainter, QPen
 
 
 class CaptureWorker(QObject):
-    change_pixmap_signal = Signal(QImage)
+    change_pixmap_signal = Signal(QImage, np.ndarray)
     print_strings = Signal(str, type(logging.DEBUG))
     send_img = Signal(numpy.ndarray)
     playing = True
 
     def __init__(self, parent=None, fps: int = 60, camera_id: int = 0):
         super().__init__(parent)
-        self.height = 720
-        self.width = 1280
-        self.fps = 60
-        self.camera = None
+        self.height: int = 720
+        self.width: int = 1280
+        self.fps: int = 60
+        self.camera: None | cv2.VideoWriter = None
         self.trained_file = None
-        self.status = True
-        self.cap = True
-        self.frame = None
-        self.rect_draw = True
-        self.rect_list = []
-        self.camera_id = camera_id
-        self.painter = QPainter()
+        self.status: bool = True
+        self.cap: bool = True
+        self.frame: None | np.ndarray | bytes = None
+        self.rect_draw: bool = True
+        self.rect_list: list = []
+        self.camera_id: int = camera_id
+        self.painter: QPainter = QPainter()
         # self.a = np.zeros((720, 1280, 3))
         # self.shm = shared_memory.SharedMemory(create=True, size=self.a.nbytes, name='cam')  # 共有メモリを作成
         # self.mp_frame = np.ndarray(self.a.shape, dtype=self.a.dtype, buffer=self.shm.buf)
         # self.p = Process(target=cam(self.camera_id))
 
     def run(self) -> None:
-        # self.p.start()
         self.open_camera(self.camera_id)
         while self.playing:
             if self.camera is not None:
@@ -53,13 +52,9 @@ class CaptureWorker(QObject):
                         h, w, ch = self.frame.shape
                         bytes_per_line = ch * w
                         image = self.generate_image(w, h, bytes_per_line)
-                        self.change_pixmap_signal.emit(image)
+                        self.change_pixmap_signal.emit(image, self.frame)
                 except RuntimeError:
                     break
-                # h, w, ch = self.mp_frame.shape
-                # bytes_per_line = ch * w
-                # image = QImage(self.mp_frame, w, h, bytes_per_line, QImage.Format.Format_BGR888)
-                # self.change_pixmap_signal.emit(image)
                 time.sleep(max(1 / self.fps - (time.perf_counter() - start), 0))
         self.destroy()
 
@@ -98,10 +93,8 @@ class CaptureWorker(QObject):
             pass
         return img
 
-    def open_camera(self, camera_id: int) -> None:
-        # self.p.kill()
-        # self.p = Process(target=cam(camera_id))
-        # self.p.start()
+    def open_camera(self, camera_id: int) -> bool:
+        # if Camera is Open, destroy Camera instance
         if self.camera is not None and self.camera.isOpened():
             self.debug("Camera is already opened")
             self.destroy()
@@ -117,13 +110,15 @@ class CaptureWorker(QObject):
 
             if not self.camera.isOpened():
                 self.error(f"Camera ID {camera_id} cannot open.")
-                return
-            self.debug(f"Camera ID {camera_id} opened successfully.")
-            # print(self.camera.get(cv2.CAP_PROP_FRAME_WIDTH))
-            # self.camera.set(cv2.CAP_PROP_FPS, 60)
-            self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-            self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
-            self.camera_id = camera_id
+                return False
+            else:
+                self.debug(f"Camera ID {camera_id} opened successfully.")
+                # print(self.camera.get(cv2.CAP_PROP_FRAME_WIDTH))
+                # self.camera.set(cv2.CAP_PROP_FPS, 60)
+                self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+                self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+                self.camera_id = camera_id
+                return True
         else:
             self.debug("Same Camera ID")
 
