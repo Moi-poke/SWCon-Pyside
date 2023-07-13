@@ -6,6 +6,7 @@ import random
 import re
 import threading
 import time
+import traceback
 from abc import abstractmethod
 from datetime import datetime
 from typing import Optional
@@ -17,6 +18,7 @@ import pykakasi
 from PySide6.QtCore import QObject, Signal, Slot, QTimer
 from PySide6.QtGui import QColor, QPainter
 
+from libs.enums import ColorType
 from libs.keys import Button, Hat, Direction
 from concurrent.futures import ThreadPoolExecutor
 
@@ -77,6 +79,7 @@ class CommandBase(QObject):
             self.info("Command finished successfully", force=True)
         except Exception as e:
             # self.error(e)
+            traceback.print_exc()
             self.error(f"{e} エラーが発生しました", force=True)
             self.stop_function.emit(True)
             # raise StopThread
@@ -200,6 +203,7 @@ class CommandBase(QObject):
     def write_serial(self, s: str):
         self.send_serial.emit(s)
 
+    # Get image from main thread and return src
     def readFrame(self):
         self.get_image.emit(True)
         return self.__src
@@ -282,21 +286,23 @@ class CommandBase(QObject):
 
     def is_contain_template(
             self,
-            template_path: str,
+            template_path: str | pathlib.Path,
             threshold=0.7,
-            use_gray: bool = False,
+            use_gray: bool | None = None,
             show_value: bool = False,
             show_position: bool = True,
             show_only_true_rect: bool = True,
             show_rect_frame: int = 120,
             color: QColor = QColor(255, 0, 0, 127),
             trim: Optional[list[int, int, int, int]] = None,
+            color_mode: ColorType = ColorType.COLOR,
+            binary_threshold: int = 128,
             show_template_name: str = ""
     ) -> bool:
         """
 
         Args:
-            template_path: テンプレートのパスを入力
+            template_path: テンプレートのパス
             threshold: 閾値
             use_gray: グレーで画像認識
             show_value: 一致度
@@ -305,19 +311,38 @@ class CommandBase(QObject):
             show_rect_frame: 枠を表示
             color: QColor, 枠の色
             trim: left_up_x, left_up_y, right_down_x, right_down_y
-            show_template_name: 画像認識させる画像の名前を表示
+            show_template_name: show Template image name
+            binary_threshold: threshold at binary
+            color_mode: Template Match Color Settings
 
         Returns:
 
         """
+        if use_gray is not None:
+            if use_gray:
+                color_mode = ColorType.GRAY
+            elif not use_gray:
+                color_mode = ColorType.COLOR
+
         self.get_image.emit(True)
-        src = cv2.cvtColor(self.__src, cv2.COLOR_BGR2GRAY) if use_gray else self.__src
+
+        src = self.set_img_color_type(self.__src, color_mode, binary_threshold)
+
         if trim is not None:
             src = src[trim[1]:trim[3], trim[0]:trim[2]]
-        template = cv2.imread(
-            self.TEMPLATE_PATH + template_path, cv2.IMREAD_GRAYSCALE if use_gray else cv2.IMREAD_COLOR
-        )
-        w, h = template.shape[1], template.shape[0]
+
+        if type(template_path) == str:
+            template = self.set_img_color_type(cv2.imread(self.TEMPLATE_PATH) + template_path, color_mode, binary_threshold)
+        elif isinstance(template_path, pathlib.Path):
+            template = self.set_img_color_type(cv2.imread((str(template_path))), color_mode, binary_threshold)
+        else:
+            template = None
+
+        if template is not None:
+            w, h = template.shape[1], template.shape[0]
+        else:
+            self.error("テンプレート画像の読み込みに失敗しました")
+            return False
 
         method = cv2.TM_CCOEFF_NORMED
         res = cv2.matchTemplate(src, template, method)
@@ -366,6 +391,20 @@ class CommandBase(QObject):
                     self.send_template_matching_pos((trim[0], trim[1]), (trim[2] - trim[0], trim[3] - trim[1]),
                                                     QColor(0, 255, 0, 255), show_rect_frame)
             return False
+
+    def set_img_color_type(self, src, color_mode, binary_threshold):
+        match color_mode:
+            case ColorType.COLOR:
+                # colorならsourceは変更しない
+                pass
+            case ColorType.GRAY:
+                src = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
+            case ColorType.BINARY:
+                src = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
+                ret, src = cv2.threshold(src, binary_threshold, 255, cv2.THRESH_BINARY)
+            case _:
+                raise Exception('Color setting failed')
+        return src
 
     @staticmethod
     def non_max_suppression(boxes: np.ndarray, scores: np.ndarray, overlap_thresh: float) -> np.ndarray:
@@ -502,6 +541,7 @@ class CommandBase(QObject):
     '''
     作:ろっこく 氏(Twitter @Rokkoku_I)
     '''
+
     # ここから
 
     # キーボードの初期化関数(キーボード画面が表示されたときに1度だけ実行すること)

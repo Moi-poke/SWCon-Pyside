@@ -11,13 +11,21 @@ class QPlainTextEditLogger(logging.Handler):
         self.widget = QtWidgets.QPlainTextEdit(parent)
         self.widget.setReadOnly(True)
         self.widget.appendPlainText("")
+        # self.widget.setStyleSheet("background-color: #f8f9fa;")
 
     def emit(self, record):
         msg = self.format(record)
         msg = msg.replace("\n", "<br>")
         # self.widget.appendPlainText(msg)
         if "ERROR" in str(msg) or "CRITICAL" in str(msg) or "FATAL" in str(msg):
-            self.widget.appendHtml(f"<span style=\"color:#ff0000;\" > {msg} </span>")
+            self.widget.appendHtml(f"<span style=\"color:#dc3545;\" > {msg} </span>")
+            # self.widget.appendHtml(f"<span style=\"color:#ffffff;background-color:#dc3545;\" > {msg} </span>")
+        elif "WARNING" in str(msg):
+            self.widget.appendHtml(f"<span style=\"background-color:#ffc107;\" > {msg} </span>")
+            # self.widget.appendHtml(f"<span style=\"color:#343a40;background-color:#ffc107;\" > {msg} </span>")
+        elif "INFO" in str(msg):
+            # self.widget.appendHtml(f"<span style=\"color:#17a2b8;\" > {msg} </span>")
+            self.widget.appendHtml(f"<span style=\"color:#ffffff;background-color:#17a2b8;\" > {msg} </span>")
         else:
             self.widget.appendHtml(f"<span style=\"color:#000000;\" > {msg} </span>")
 
