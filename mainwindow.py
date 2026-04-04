@@ -1,167 +1,171 @@
+from __future__ import annotations
+
 import copy
 import logging
 import math
 import os
 import platform
-import queue
 import sys
-import time
-from ctypes import *
 from logging import getLogger
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
+from cv2_enumerate_cameras import enumerate_cameras
+
 
 import cv2
-import PySide6
 import numpy as np
-import shiboken6
-from PySide6 import QtCore, QtWidgets
-from PySide6.QtCore import QSize, Qt, QThread, Signal, Slot
-from PySide6.QtGui import QColor, QImage, QPainter, QPen, QPixmap
-from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox
 
-from libs import sender
+import PySide6
+from PySide6 import QtCore
+from PySide6.QtCore import QSize, Qt, QThread, Signal, Slot
+from PySide6.QtCore import QTimer
+from PySide6.QtGui import QCloseEvent, QColor, QImage, QPixmap, QResizeEvent
+from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox, QWidget
+
 from libs.capture import CaptureWorker
+from libs.command_runtime import CommandRuntime
 from libs.com_port_assist import serial_ports
 from libs.CommandBase import CommandBase
 from libs.CommandLoader import CommandLoader
+from libs.frame_store import FrameStore
 from libs.game_pad_connect import GamepadController
-from libs.keys import Button, Direction, Hat, KeyPress, Stick
+from libs.gui_stick_store import GuiStickStore
+from libs.keys import KeyPress
 from libs.mcu_command_base import McuCommand
+from libs.serial_worker import SerialWorker
 from libs.settings import Setting
-from libs.Utility import ospath
 from libs.template_match_support import TemplateMatchSupport
+from libs.Utility import ospath
 from ui.main_ui import Ui_MainWindow
 from ui.QtextLogger import QPlainTextEditLogger
-from libs.LineNotify import LineNotify
 
-VERSION = "0.7.4 (beta)"
+VERSION = "0.8.0 (beta)"
 Author = "Moi"
 
 
-# Todo
-# GUIの起動
 class MainWindow(QMainWindow, Ui_MainWindow):
-    stop_request = Signal(bool)
+    request_capture_reopen = Signal(int)
+    request_capture_set_fps = Signal(int)
+    request_capture_save = Signal(object, object, object, object, str)
+    request_capture_add_rect = Signal(tuple, tuple, object, int)
+    request_capture_stop = Signal()
+    request_capture_frame_stream = Signal(bool)
+
+    request_serial_open = Signal(object, str)
+    request_serial_close = Signal()
+    request_serial_write = Signal(str, bool)
+    request_serial_keypress = Signal(object, float, float, object)
+    request_serial_button_pressed = Signal(str)
+    request_serial_button_released = Signal(str)
+    request_serial_axis = Signal(float, float, float, float)
+    request_serial_show = Signal(bool)
+
+    request_gamepad_stop = Signal()
+    request_gamepad_pause = Signal(bool)
+    request_gamepad_reconnect = Signal()
+    request_gamepad_set_keymap = Signal(object)
+    request_gamepad_set_l_stick = Signal(bool)
+    request_gamepad_set_r_stick = Signal(bool)
 
     def __init__(
-            self,
-            parent: Optional[PySide6.QtWidgets.QWidget] = None,
-            flags: PySide6.QtCore.Qt.WindowFlags = QtCore.Qt.Window,
+        self,
+        parent: Optional[QWidget] = None,
+        flags: Qt.WindowType = QtCore.Qt.WindowType.Window,
     ) -> None:
-        """_summary_
-
-        Args:
-            parent (Optional[PySide6.QtWidgets.QWidget], optional): _description_. Defaults to None.
-            flags (PySide6.QtCore.Qt.WindowFlags, optional): _description_. Defaults to QtCore.Qt.Window.
-        """
         super().__init__(parent, flags)
+
         self.logger = getLogger(__name__)
-        self.thread_1 = None
-        self.capture_worker = None
-        self.thread_2 = None
-        self.worker = None
-        self.GamepadController_worker = None
-        self.GamepadController_thread = QThread()
-        self.thread_do = None
-        self.img = None
-        self.command_mode = None
+
+        self.capture_thread: Optional[QThread] = None
+        self.capture_worker: Optional[CaptureWorker] = None
+
+        self.serial_thread: Optional[QThread] = None
+        self.serial_worker: Optional[SerialWorker] = None
+
+        self.gamepad_thread: Optional[QThread] = None
+        self.gamepad_worker: Optional[GamepadController] = None
+
+        self.command_runtime: Optional[CommandRuntime] = None
+
+        self.img: Optional[QImage] = None
+        self.command_mode: Optional[str] = None
         self.is_show_serial = False
-        self.keyPress = None
         self.keymap = None
         self.mcu_cur_command = None
         self.py_cur_command = None
         self.cur_command = None
         self.template_matching_support_tool = None
-        # コマンドをロードするインスタンス用の変数初期化
+
+        self.frame_store = FrameStore()
+        self.gui_stick_store = GuiStickStore()
+        self._last_preview_seq = 0
+        self.preview_timer: Optional[QTimer] = None
+
         self.py_loader = None
         self.mcu_loader = None
-        self.py_classes = None
-        self.mcu_classes = None
+        self.py_classes: list[list[Any]] = []
+        self.mcu_classes: list[list[Any]] = []
 
-        self.gui_l_stick = 0
-        self.gui_r_stick = 0
-
-        self.bef_left_angle = None
-        self.bef_left_r = None
-        self.bef_right_angle = None
-        self.bef_right_r = None
+        self._serial_open = False
 
         self.setting = Setting()
 
         self.setupUi(self)
         self.setWindowTitle(f"SWController {VERSION}")
 
-        self.pushButtonReloadCamera.pressed.connect(lambda: self.reconnect_camera(self.lineEditCameraID.text()))
-        self.pushButtonReloadCamera.pressed.connect(self.reload_camera)
-
-        self.plainTextEdit = QPlainTextEditLogger(self.dockWidgetContents)
-        self.plainTextEdit.widget.setObjectName("plainTextEdit")
-        self.plainTextEdit.widget.setEnabled(True)
-        self.plainTextEdit.widget.setMinimumSize(QSize(500, 195))
-        self.plainTextEdit.widget.setUndoRedoEnabled(True)
-        self.plainTextEdit.widget.setCursorWidth(-2)
-        self.plainTextEdit.widget.setTextInteractionFlags(Qt.TextSelectableByMouse)
-
-        self.gridLayout.addWidget(self.plainTextEdit.widget, 0, 0, 1, 1)
+        self._setup_log_widget()
         self.setFocus()
 
         self.set_settings()
-        py_cmd = self.setting.setting["command"]["py_command"]
-        mcu_cmd = self.setting.setting["command"]["mcu_command"]
-
-        # self.gamepad_setting = SettingWindow(parent=self, _setting=self.setting)
-        # self.gamepad_setting.show()
-
-        self.q: queue.Queue = queue.Queue()
+        settings = self.setting.setting
+        if settings is None:
+            raise RuntimeError("Settings are not loaded")
         self.setup_functions_connect()
 
-        try:
-            # camera名取得はうまくいかない
-            if platform.system() == 'Windows':
-                import clr
-                clr.AddReference("./DirectShowLib/DirectShowLib-2005")
-                from DirectShowLib import DsDevice, FilterCategory
-
-                # print(DirectShowLib)
-                capture_devices = DsDevice.GetDevicesOfCat(FilterCategory.VideoInputDevice)
-                self.camera_dic = {cam_id: device.Name for cam_id, device in enumerate(capture_devices)}
-                self.camera_dic[str(max(list(self.camera_dic.keys())) + 1)] = ''
-                print([device for device in self.camera_dic.values()])
-            else:
-                self.comboBoxCameraNames.setDisabled(True)
-        except Exception as e:
-            self.comboBoxCameraNames.setDisabled(True)
-            pass
-
         self.connect_capture()
-
-        # You can format what is printed to text box
-        self.plainTextEdit.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
-        # You can control the logging level
-        self.logger.setLevel(logging.DEBUG)
-        self.logger.addHandler(self.plainTextEdit)
-
-        self.pushButtonClearLog.pressed.connect(self.plainTextEdit.widget.clear)
-
-        self.ser = sender.Sender(self.is_show_serial)
-        self.ser.print_strings.connect(self.callback_string_to_log)
-        self.activate_serial()
-        self.activate_keyboard()
+        self.connect_serial()
         self.connect_gamepad()
+        self.connect_command_runtime()
+
         self.load_commands()
         self.show_serial()
 
+        py_cmd = settings["command"]["py_command"]
+        mcu_cmd = settings["command"]["mcu_command"]
+
         try:
-            self.comboBox_MCU.setCurrentIndex(self.comboBoxPython.findText(mcu_cmd))
-            self.comboBoxPython.setCurrentIndex(self.comboBoxPython.findText(py_cmd))
-        except Exception as e:
+            mcu_idx = self.comboBox_MCU.findText(mcu_cmd)
+            if mcu_idx >= 0:
+                self.comboBox_MCU.setCurrentIndex(mcu_idx)
+
+            py_idx = self.comboBoxPython.findText(py_cmd)
+            if py_idx >= 0:
+                self.comboBoxPython.setCurrentIndex(py_idx)
+        except Exception:
             self.logger.debug("There seems to have been a change in the script.")
 
-        # スレッドの開始
-        if self.thread_1 is not None:
-            self.thread_1.start()
-        self.GamepadController_thread.start()
+        self._init_camera_name_list()
+
+        settings = self.setting.setting
+        if settings is None:
+            raise RuntimeError("Settings are not loaded.")
+
+        if self.camera_list:
+            target_id = str(settings["main_window"]["must"]["camera_id"])
+            for i, cam in enumerate(self.camera_list):
+                if str(cam["index"]) == target_id:
+                    self.comboBoxCameraNames.setCurrentIndex(i)
+                    break
+
+        self.activate_serial()
+
+        self.preview_timer = QTimer(self)
+        self.preview_timer.setTimerType(Qt.TimerType.PreciseTimer)
+        self.preview_timer.setInterval(16)
+        self.preview_timer.timeout.connect(self.render_latest_preview)
+        self.preview_timer.start()
+
+        self._sync_command_buttons()
 
         if self.setting is not None:
             if self.setting.setting["main_window"]["option"]["window_showMaximized"]:
@@ -171,1171 +175,771 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     self.setting.setting["main_window"]["option"]["window_size_width"],
                     self.setting.setting["main_window"]["option"]["window_size_height"],
                 )
-        # self.pushButtonScreenShot.clicked.connect(self.test)
-        # self.CaptureImageArea.mousePressEvent = self.capture_mousePressEvent
-        # print(self.setting.setting["line"])
-        self.line_notify = LineNotify(tokens=self.setting.setting["line"])
-        self.line_notify.print_strings.connect(self.callback_string_to_log)
-        # self.logger.debug(self.line_notify.send_text("test", token_key="token_3"))
 
-    def test(self):
-        self.BTN_a.toggle()
+    def _setup_log_widget(self) -> None:
+        self.plainTextEdit = QPlainTextEditLogger(self.dockWidgetContents)
+        self.plainTextEdit.widget.setObjectName("plainTextEdit")
+        self.plainTextEdit.widget.setEnabled(True)
+        self.plainTextEdit.widget.setMinimumSize(QSize(500, 195))
+        self.plainTextEdit.widget.setUndoRedoEnabled(True)
+        self.plainTextEdit.widget.setCursorWidth(-2)
+        self.plainTextEdit.widget.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.gridLayout.addWidget(self.plainTextEdit.widget, 0, 0, 1, 1)
+        self.plainTextEdit.setFormatter(
+            logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        )
+        self.logger.setLevel(logging.DEBUG)
+        self.logger.addHandler(self.plainTextEdit)
 
-    def gui_stick_left(self, angle, r):
-        self.gui_l_stick = r
-        self.keyPress.input(Direction(Stick.LEFT, angle, r))
+    def _init_camera_name_list(self) -> None:
+        self.camera_list: list[dict[str, object]] = []
+        self.camera_dic: dict[str, str] = {}
+        self.comboBoxCameraNames.clear()
 
-    def gui_stick_right(self, angle, r):
-        self.gui_r_stick = r
-        self.keyPress.input(Direction(Stick.RIGHT, angle, r))
-
-    # <editor-fold desc="ゲームパッド関連">
-    def connect_gamepad(self):
-        # Controllerスレッドの作成
         try:
-            self.GamepadController_worker = GamepadController()
-            self.GamepadController_thread = QThread()
-            self.GamepadController_worker.moveToThread(self.GamepadController_thread)
-            self.GamepadController_thread.started.connect(self.GamepadController_worker.run)
+            cameras = enumerate_cameras(cv2.CAP_DSHOW)
+        except Exception as exc:
+            self.logger.warning(
+                f"Failed to enumerate cameras with cv2-enumerate-cameras: {exc}"
+            )
+            self.comboBoxCameraNames.setDisabled(True)
+            return
 
-            self.GamepadController_worker.set_keymap(self.keymap)
+        if not cameras:
+            self.comboBoxCameraNames.setDisabled(True)
+            self.logger.info("No cameras found on CAP_DSHOW.")
+            return
 
-            self.GamepadController_worker.ZL_PRESSED.connect(self.press_zl)
-            self.GamepadController_worker.L_PRESSED.connect(self.press_l)
-            self.GamepadController_worker.LCLICK_PRESSED.connect(self.press_lclick)
-            self.GamepadController_worker.MINUS_PRESSED.connect(self.press_minus)
-            self.GamepadController_worker.TOP_PRESSED.connect(self.press_top)
-            self.GamepadController_worker.BTM_PRESSED.connect(self.press_btm)
-            self.GamepadController_worker.LEFT_PRESSED.connect(self.press_left)
-            self.GamepadController_worker.RIGHT_PRESSED.connect(self.press_right)
-            self.GamepadController_worker.CAPTURE_PRESSED.connect(self.press_capture)
-            self.GamepadController_worker.ZR_PRESSED.connect(self.press_zr)
-            self.GamepadController_worker.R_PRESSED.connect(self.press_r)
-            self.GamepadController_worker.RCLICK_PRESSED.connect(self.press_rclick)
-            self.GamepadController_worker.PLUS_PRESSED.connect(self.press_plus)
-            self.GamepadController_worker.A_PRESSED.connect(self.press_a)
-            self.GamepadController_worker.B_PRESSED.connect(self.press_b)
-            self.GamepadController_worker.X_PRESSED.connect(self.press_x)
-            self.GamepadController_worker.Y_PRESSED.connect(self.press_y)
-            self.GamepadController_worker.HOME_PRESSED.connect(self.press_home)
+        self.comboBoxCameraNames.setDisabled(False)
 
-            self.GamepadController_worker.ZL_RELEASED.connect(self.release_zl)
-            self.GamepadController_worker.L_RELEASED.connect(self.release_l)
-            self.GamepadController_worker.LCLICK_RELEASED.connect(self.release_lclick)
-            self.GamepadController_worker.MINUS_RELEASED.connect(self.release_minus)
-            self.GamepadController_worker.TOP_RELEASED.connect(self.release_top)
-            self.GamepadController_worker.BTM_RELEASED.connect(self.release_btm)
-            self.GamepadController_worker.LEFT_RELEASED.connect(self.release_left)
-            self.GamepadController_worker.RIGHT_RELEASED.connect(self.release_right)
-            self.GamepadController_worker.CAPTURE_RELEASED.connect(self.release_capture)
-            self.GamepadController_worker.ZR_RELEASED.connect(self.release_zr)
-            self.GamepadController_worker.R_RELEASED.connect(self.release_r)
-            self.GamepadController_worker.RCLICK_RELEASED.connect(self.release_rclick)
-            self.GamepadController_worker.PLUS_RELEASED.connect(self.release_plus)
-            self.GamepadController_worker.A_RELEASED.connect(self.release_a)
-            self.GamepadController_worker.B_RELEASED.connect(self.release_b)
-            self.GamepadController_worker.X_RELEASED.connect(self.release_x)
-            self.GamepadController_worker.Y_RELEASED.connect(self.release_y)
-            self.GamepadController_worker.HOME_RELEASED.connect(self.release_home)
+        for cam in cameras:
+            label = f"{cam.index}: {cam.name}"
+            self.comboBoxCameraNames.addItem(label)
+            self.camera_list.append(
+                {
+                    "index": cam.index,
+                    "name": cam.name,
+                    "path": getattr(cam, "path", ""),
+                    "backend": getattr(cam, "backend", cv2.CAP_DSHOW),
+                }
+            )
+            self.camera_dic[str(cam.index)] = cam.name
 
-            self.GamepadController_worker.AXIS_MOVED.connect(self.stickMoveEvent, type=Qt.QueuedConnection)
-            self.GamepadController_worker.AXIS_MOVED.connect(self.stick_control, type=Qt.DirectConnection)
+    # ------------------------------------------------------------------
+    # worker wiring
+    # ------------------------------------------------------------------
 
-            self.GamepadController_worker.print_strings.connect(self.callback_string_to_log, type=Qt.QueuedConnection)
-
-            self.gamepad_l_stick()
-            self.gamepad_r_stick()
-
-            self.GamepadController_thread.finished.connect(self.GamepadController_worker.deleteLater)
-            self.GamepadController_thread.finished.connect(self.GamepadController_worker.stop)
-
-            if self.GamepadController_worker.no_joystick:
-                self.logger.debug("コントローラー接続なし")
-        except Exception as e:
-            self.logger.error(e)
-
-    def stickMoveEvent(self, left_horizontal, left_vertical, right_horizontal, right_vertical):
+    def connect_capture(self) -> None:
+        self.capture_thread = QThread(self)
         try:
-            left_angle = math.atan2(left_vertical, left_horizontal)
-            left_r = math.sqrt(left_vertical ** 2 + left_horizontal ** 2)
-            right_angle = math.atan2(right_vertical, right_horizontal)
-            right_r = math.sqrt(right_vertical ** 2 + right_horizontal ** 2)
-
-            # print(left_r, right_r)
-            dead_zone = 0.35  # これ以下の傾きは無視(デッドゾーン)
-            if left_r < dead_zone:
-                left_r = 0
-            else:
-                left_r -= dead_zone
-                left_r /= (1 - dead_zone)
-                ...
-            if right_r < dead_zone:
-                right_r = 0
-            else:
-                right_r -= dead_zone
-                right_r /= (1 - dead_zone)
-                ...
-
-            self.left_stick.stickMoveEvent(left_r, left_angle)
-            self.right_stick.stickMoveEvent(right_r, right_angle)
-        except KeyboardInterrupt:
-            self.close()
-
-    def reconnect_gamepad(self):
-        self.GamepadController_worker.connect_joystick()
-        pass
-
-    def BTN_click(self, event=None):
-        btn = self.sender().objectName()[4:]
-        match btn:
-            case "zl":
-                if self.sender().isChecked():
-                    self.press_zl()
-                else:
-                    self.release_zl()
-            case "l":
-                if self.sender().isChecked():
-                    self.press_l()
-                else:
-                    self.release_l()
-            case "up":
-                if self.sender().isChecked():
-                    self.press_top()
-                else:
-                    self.release_top()
-            case "down":
-                if self.sender().isChecked():
-                    self.press_btm()
-                else:
-                    self.release_btm()
-            case "left":
-                if self.sender().isChecked():
-                    self.press_left()
-                else:
-                    self.release_left()
-            case "right":
-                if self.sender().isChecked():
-                    self.press_right()
-                else:
-                    self.release_right()
-            case "capture":
-                if self.sender().isChecked():
-                    self.press_capture()
-                else:
-                    self.release_capture()
-            case "ls":
-                if self.sender().isChecked():
-                    self.press_lclick()
-                else:
-                    self.release_lclick()
-            case "minus":
-                if self.sender().isChecked():
-                    self.press_minus()
-                else:
-                    self.release_minus()
-            case "zr":
-                if self.sender().isChecked():
-                    self.press_zr()
-                else:
-                    self.release_zr()
-            case "r":
-                if self.sender().isChecked():
-                    self.press_r()
-                else:
-                    self.release_r()
-            case "plus":
-                if self.sender().isChecked():
-                    self.press_plus()
-                else:
-                    self.release_plus()
-            case "rs":
-                if self.sender().isChecked():
-                    self.press_rclick()
-                else:
-                    self.release_rclick()
-            case "a":
-                if self.sender().isChecked():
-                    self.press_a()
-                else:
-                    self.release_a()
-            case "b":
-                if self.sender().isChecked():
-                    self.press_b()
-                else:
-                    self.release_b()
-            case "x":
-                if self.sender().isChecked():
-                    self.press_x()
-                else:
-                    self.release_x()
-            case "y":
-                if self.sender().isChecked():
-                    self.press_y()
-                else:
-                    self.release_y()
-            case "home":
-                if self.sender().isChecked():
-                    self.press_home()
-                else:
-                    self.release_home()
-
-    def press_zl(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            else:
-                joystick = False
+            camera_id = int(self.lineEditCameraID.text())
         except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_zl.setChecked(True)
+            camera_id = -1
 
-        self.keyPress.input(Button.ZL)
+        self.capture_worker = CaptureWorker(
+            camera_id=camera_id,
+            frame_store=self.frame_store,
+        )
+        self.capture_worker.moveToThread(self.capture_thread)
 
-    def press_l(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_l.setChecked(True)
-        self.keyPress.input(Button.L)
+        self.capture_thread.started.connect(self.capture_worker.start_capture)
+        self.capture_thread.finished.connect(self.capture_worker.deleteLater)
 
-    def press_lclick(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_ls.setChecked(True)
-        self.keyPress.input(Button.LCLICK)
+        self.capture_worker.log.connect(
+            self.callback_string_to_log,
+            type=Qt.ConnectionType.QueuedConnection,
+        )
 
-    def press_minus(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_minus.setChecked(True)
-        self.keyPress.input(Button.MINUS)
+        self.request_capture_reopen.connect(
+            self.capture_worker.reopen_camera,
+            type=Qt.ConnectionType.QueuedConnection,
+        )
+        self.request_capture_set_fps.connect(
+            self.capture_worker.set_fps,
+            type=Qt.ConnectionType.QueuedConnection,
+        )
+        self.request_capture_save.connect(
+            self.capture_worker.save_capture,
+            type=Qt.ConnectionType.QueuedConnection,
+        )
+        self.request_capture_add_rect.connect(
+            self.capture_worker.add_rect,
+            type=Qt.ConnectionType.QueuedConnection,
+        )
+        self.request_capture_stop.connect(
+            self.capture_worker.stop_capture,
+            type=Qt.ConnectionType.QueuedConnection,
+        )
+        self.request_capture_frame_stream.connect(
+            self.capture_worker.set_frame_stream_enabled,
+            type=Qt.ConnectionType.QueuedConnection,
+        )
 
-    def press_top(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_up.setChecked(True)
-        self.keyPress.input(Hat.TOP)
+        self.capture_thread.start()
 
-    def press_btm(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_down.setChecked(True)
-        self.keyPress.input(Hat.BTM)
+    def connect_serial(self) -> None:
+        self.serial_thread = QThread(self)
+        self.serial_worker = SerialWorker(
+            is_show_serial=self.is_show_serial,
+            keypress_factory=KeyPress,
+            gui_stick_store=self.gui_stick_store,
+        )
 
-    def press_left(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_left.setChecked(True)
-        self.keyPress.input(Hat.LEFT)
+        self.serial_worker.moveToThread(self.serial_thread)
 
-    def press_right(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_right.setChecked(True)
-        self.keyPress.input(Hat.RIGHT)
+        self.serial_thread.started.connect(self.serial_worker.start)
+        self.serial_thread.finished.connect(self.serial_worker.deleteLater)
 
-    def press_capture(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_capture.setChecked(True)
-        self.keyPress.input(Button.CAPTURE)
+        self.request_serial_open.connect(
+            self.serial_worker.open_port, Qt.ConnectionType.QueuedConnection
+        )
+        self.request_serial_close.connect(
+            self.serial_worker.close_port, Qt.ConnectionType.QueuedConnection
+        )
+        self.request_serial_write.connect(
+            self.serial_worker.write_row, Qt.ConnectionType.QueuedConnection
+        )
+        self.request_serial_keypress.connect(
+            self.serial_worker.on_keypress, Qt.ConnectionType.QueuedConnection
+        )
+        self.request_serial_button_pressed.connect(
+            self.serial_worker.on_named_button_pressed,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        self.request_serial_button_released.connect(
+            self.serial_worker.on_named_button_released,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        self.request_serial_axis.connect(
+            self.serial_worker.on_axis_moved, Qt.ConnectionType.QueuedConnection
+        )
+        self.request_serial_show.connect(
+            self.serial_worker.set_show_serial, Qt.ConnectionType.QueuedConnection
+        )
 
-    def press_zr(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_zr.setChecked(True)
-        self.keyPress.input(Button.ZR)
+        self.serial_worker.log.connect(
+            self.callback_string_to_log, Qt.ConnectionType.QueuedConnection
+        )
+        self.serial_worker.serial_error.connect(
+            self.on_serial_error, Qt.ConnectionType.QueuedConnection
+        )
+        self.serial_worker.serial_state_changed.connect(
+            self.on_serial_state_changed, Qt.ConnectionType.QueuedConnection
+        )
 
-    def press_r(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_r.setChecked(True)
-        self.keyPress.input(Button.R)
+        self.serial_thread.start()
 
-    def press_rclick(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_rs.setChecked(True)
-        self.keyPress.input(Button.RCLICK)
+    def connect_gamepad(self) -> None:
+        self.gamepad_thread = QThread(self)
+        self.gamepad_worker = GamepadController()
+        self.gamepad_worker.moveToThread(self.gamepad_thread)
 
-    def press_plus(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_plus.setChecked(True)
-        self.keyPress.input(Button.PLUS)
+        self.gamepad_thread.started.connect(self.gamepad_worker.run)
+        self.gamepad_thread.finished.connect(self.gamepad_worker.deleteLater)
 
-    def press_a(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_a.setChecked(True)
-        self.keyPress.input(Button.A)
+        self.request_gamepad_stop.connect(
+            self.gamepad_worker.stop, Qt.ConnectionType.QueuedConnection
+        )
+        self.request_gamepad_pause.connect(
+            self.gamepad_worker.set_pause, Qt.ConnectionType.QueuedConnection
+        )
+        self.request_gamepad_reconnect.connect(
+            self.gamepad_worker.connect_joystick, Qt.ConnectionType.QueuedConnection
+        )
 
-    def press_b(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_b.setChecked(True)
-        self.keyPress.input(Button.B)
+        self.request_gamepad_set_keymap.connect(
+            self.gamepad_worker.set_keymap,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        self.request_gamepad_set_l_stick.connect(
+            self.gamepad_worker.set_l_stick,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        self.request_gamepad_set_r_stick.connect(
+            self.gamepad_worker.set_r_stick,
+            Qt.ConnectionType.QueuedConnection,
+        )
 
-    def press_x(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_x.setChecked(True)
-        self.keyPress.input(Button.X)
+        self.gamepad_worker.button_pressed.connect(
+            self.handle_gamepad_button_pressed, Qt.ConnectionType.QueuedConnection
+        )
+        self.gamepad_worker.button_released.connect(
+            self.handle_gamepad_button_released, Qt.ConnectionType.QueuedConnection
+        )
+        self.gamepad_worker.axis_moved.connect(
+            self.handle_gamepad_axis_moved, Qt.ConnectionType.QueuedConnection
+        )
+        self.gamepad_worker.log.connect(
+            self.callback_string_to_log, Qt.ConnectionType.QueuedConnection
+        )
 
-    def press_y(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_y.setChecked(True)
-        self.keyPress.input(Button.Y)
+        self.gamepad_thread.start()
+        self.request_gamepad_set_keymap.emit(self.keymap)
+        self.gamepad_l_stick()
+        self.gamepad_r_stick()
 
-    def press_home(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_home.setChecked(True)
-        self.keyPress.input(Button.HOME)
+    def connect_command_runtime(self) -> None:
+        self.command_runtime = CommandRuntime(self.frame_store, self)
+        self.command_runtime.log.connect(
+            self.callback_string_to_log,
+            type=Qt.ConnectionType.QueuedConnection,
+        )
+        self.command_runtime.started.connect(
+            self.on_command_started,
+            type=Qt.ConnectionType.QueuedConnection,
+        )
+        self.command_runtime.stopped.connect(
+            self.on_command_stopped,
+            type=Qt.ConnectionType.QueuedConnection,
+        )
 
-    def release_zl(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            elif isinstance(self.sender(), QtWidgets.QPushButton):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_zl.setChecked(False)
-        self.keyPress.inputEnd(Button.ZL)
+    @Slot()
+    def render_latest_preview(self) -> None:
+        image, seq = self.frame_store.get_preview_if_new(self._last_preview_seq)
+        if image is None:
+            return
 
-    def release_l(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            elif isinstance(self.sender(), QtWidgets.QPushButton):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_l.setChecked(False)
-        self.keyPress.inputEnd(Button.L)
+        self._last_preview_seq = seq
+        self.img = image
+        pix = QPixmap.fromImage(image)
+        self.CaptureImageArea.setPixmap(pix)
 
-    def release_lclick(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            elif isinstance(self.sender(), QtWidgets.QPushButton):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_ls.setChecked(False)
-        self.keyPress.inputEnd(Button.LCLICK)
+    # ------------------------------------------------------------------
+    # UI wiring
+    # ------------------------------------------------------------------
+    def setup_functions_connect(self) -> None:
+        self.pushButtonReloadCamera.pressed.connect(
+            lambda: self.reconnect_camera(self.lineEditCameraID.text())
+        )
+        self.pushButtonReloadCamera.pressed.connect(self.reload_camera)
 
-    def release_minus(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            elif isinstance(self.sender(), QtWidgets.QPushButton):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_minus.setChecked(False)
-        self.keyPress.inputEnd(Button.MINUS)
+        self.pushButtonClearLog.pressed.connect(self.plainTextEdit.widget.clear)
 
-    def release_top(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            elif isinstance(self.sender(), QtWidgets.QPushButton):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_up.setChecked(False)
-        self.keyPress.inputEnd(Hat.TOP)
-
-    def release_btm(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            elif isinstance(self.sender(), QtWidgets.QPushButton):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_down.setChecked(False)
-        self.keyPress.inputEnd(Hat.BTM)
-
-    def release_left(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            elif isinstance(self.sender(), QtWidgets.QPushButton):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_left.setChecked(False)
-        self.keyPress.inputEnd(Hat.LEFT)
-
-    def release_right(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            elif isinstance(self.sender(), QtWidgets.QPushButton):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_right.setChecked(False)
-        self.keyPress.inputEnd(Hat.RIGHT)
-
-    def release_capture(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            elif isinstance(self.sender(), QtWidgets.QPushButton):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_capture.setChecked(False)
-        self.keyPress.inputEnd(Button.CAPTURE)
-
-    def release_zr(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            elif isinstance(self.sender(), QtWidgets.QPushButton):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_zr.setChecked(False)
-        self.keyPress.inputEnd(Button.ZR)
-
-    def release_r(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            elif isinstance(self.sender(), QtWidgets.QPushButton):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_r.setChecked(False)
-        self.keyPress.inputEnd(Button.R)
-
-    def release_rclick(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            elif isinstance(self.sender(), QtWidgets.QPushButton):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_rs.setChecked(False)
-        self.keyPress.inputEnd(Button.RCLICK)
-
-    def release_plus(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            elif isinstance(self.sender(), QtWidgets.QPushButton):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_plus.setChecked(False)
-        self.keyPress.inputEnd(Button.PLUS)
-
-    def release_a(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            elif isinstance(self.sender(), QtWidgets.QPushButton):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_a.setChecked(False)
-        self.keyPress.inputEnd(Button.A)
-
-    def release_b(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            elif isinstance(self.sender(), QtWidgets.QPushButton):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_b.setChecked(False)
-        self.keyPress.inputEnd(Button.B)
-
-    def release_x(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            elif isinstance(self.sender(), QtWidgets.QPushButton):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_x.setChecked(False)
-        self.keyPress.inputEnd(Button.X)
-
-    def release_y(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            elif isinstance(self.sender(), QtWidgets.QPushButton):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_y.setChecked(False)
-        self.keyPress.inputEnd(Button.Y)
-
-    def release_home(self):
-        try:
-            if isinstance(self.sender(), type(self.GamepadController_worker)):
-                joystick = True
-            elif isinstance(self.sender(), QtWidgets.QPushButton):
-                joystick = True
-            else:
-                joystick = False
-        except Exception:
-            joystick = False
-        if joystick:
-            self.BTN_home.setChecked(False)
-        self.keyPress.inputEnd(Button.HOME)
-
-    def stick_control(self, left_horizontal, left_vertical, right_horizontal, right_vertical):
-        left_angle = -math.degrees(math.atan2(left_vertical, left_horizontal))
-        left_r = math.sqrt(left_vertical ** 2 + left_horizontal ** 2)
-        right_angle = -math.degrees(math.atan2(right_vertical, right_horizontal))
-        right_r = math.sqrt(right_vertical ** 2 + right_horizontal ** 2)
-
-        # print(left_r, right_r)
-        dead_zone = 0.35  # これ以下の傾きは無視(デッドゾーン)
-        if left_r < dead_zone:
-            left_r = 0
-        else:
-            left_r -= dead_zone
-            left_r /= (1 - dead_zone)
-            ...
-        if right_r < dead_zone:
-            right_r = 0
-        else:
-            right_r -= dead_zone
-            right_r /= (1 - dead_zone)
-            ...
-
-        # print(left_angle, left_r)
-        # if self.bef_left_r is None or (left_r != 0 and self.bef_left_r != left_r) or (
-        #         right_r != 0 and self.bef_right_r != right_r):
-        #     self.logger.debug(f"left:{left_angle:.2f}, {left_r:.2f}  right:{right_angle:.2f}, {right_r:.2f}")
-        if self.keyPress is not None:
-            if self.gui_l_stick == 0 and self.gui_r_stick == 0:
-                self.keyPress.input(
-                    [Direction(Stick.LEFT, left_angle, left_r), Direction(Stick.RIGHT, right_angle, right_r)]
-                )
-            elif self.gui_l_stick > 0 and self.gui_r_stick == 0:
-                self.keyPress.input([Direction(Stick.RIGHT, right_angle, right_r)])
-            elif self.gui_l_stick == 0 and self.gui_r_stick > 0:
-                self.keyPress.input([Direction(Stick.LEFT, left_angle, left_r)])
-
-        self.bef_left_angle = left_angle
-        self.bef_left_r = left_r
-        self.bef_right_angle = right_angle
-        self.bef_right_r = right_r
-
-    def gamepad_l_stick(self):
-        if self.setting.setting["key_config"]["joystick"]["direction"]["LStick"]:
-            self.GamepadController_worker.set_l_stick(True)
-
-    def gamepad_r_stick(self):
-        if self.setting.setting["key_config"]["joystick"]["direction"]["RStick"]:
-            self.GamepadController_worker.set_r_stick(True)
-
-    # </editor-fold>
-
-    def connect_capture(self):
-        self.thread_1 = QThread()
-        try:
-            self.capture_worker = CaptureWorker(camera_id=int(self.lineEditCameraID.text()))
-        except:
-            self.capture_worker = CaptureWorker(camera_id=-1)
-
-        self.capture_worker.moveToThread(self.thread_1)
-
-        self.capture_worker.change_pixmap_signal.connect(self.update_image, type=Qt.QueuedConnection)
-        self.capture_worker.print_strings.connect(self.callback_string_to_log, type=Qt.QueuedConnection)
-
-        self.thread_1.started.connect(self.capture_worker.run)
-
-        self.thread_1.finished.connect(self.capture_worker.deleteLater)
-        self.thread_1.finished.connect(self.thread_1.deleteLater)
-
-    def setup_functions_connect(self):
-
-        # controllerボタンの割当
-        self.BTN_zl.pressed.connect(self.press_zl)
-        self.BTN_l.pressed.connect(self.press_l)
-        self.BTN_ls.pressed.connect(self.press_lclick)
-        self.BTN_minus.pressed.connect(self.press_minus)
-        self.BTN_up.pressed.connect(self.press_top)
-        self.BTN_down.pressed.connect(self.press_btm)
-        self.BTN_left.pressed.connect(self.press_left)
-        self.BTN_right.pressed.connect(self.press_right)
-        self.BTN_capture.pressed.connect(self.press_capture)
-        self.BTN_zr.pressed.connect(self.press_zr)
-        self.BTN_r.pressed.connect(self.press_r)
-        self.BTN_rs.pressed.connect(self.press_rclick)
-        self.BTN_plus.pressed.connect(self.press_plus)
-        self.BTN_a.pressed.connect(self.press_a)
-        self.BTN_b.pressed.connect(self.press_b)
-        self.BTN_x.pressed.connect(self.press_x)
-        self.BTN_y.pressed.connect(self.press_y)
-        self.BTN_home.pressed.connect(self.press_home)
-
-        self.BTN_zl.released.connect(self.release_zl)
-        self.BTN_l.released.connect(self.release_l)
-        self.BTN_ls.released.connect(self.release_lclick)
-        self.BTN_minus.released.connect(self.release_minus)
-        self.BTN_up.released.connect(self.release_top)
-        self.BTN_down.released.connect(self.release_btm)
-        self.BTN_left.released.connect(self.release_left)
-        self.BTN_right.released.connect(self.release_right)
-        self.BTN_capture.released.connect(self.release_capture)
-        self.BTN_zr.released.connect(self.release_zr)
-        self.BTN_r.released.connect(self.release_r)
-        self.BTN_rs.released.connect(self.release_rclick)
-        self.BTN_plus.released.connect(self.release_plus)
-        self.BTN_a.released.connect(self.release_a)
-        self.BTN_b.released.connect(self.release_b)
-        self.BTN_x.released.connect(self.release_x)
-        self.BTN_y.released.connect(self.release_y)
-        self.BTN_home.released.connect(self.release_home)
-
-        # self.BTN_zl.released.connect(self.release_zl)
-        # self.BTN_l.released.connect(self.release_l)
-        # self.BTN_up.released.connect(self.release_lclick)
-        # self.BTN_down.released.connect(self.release_minus)
-        # self.BTN_left.released.connect(self.release_top)
-        # self.BTN_right.released.connect(self.release_btm)
-        # self.BTN_capture.released.connect(self.release_left)
-        # self.BTN_ls.released.connect(self.release_right)
-        # self.BTN_minus.released.connect(self.release_capture)
-        # self.BTN_zr.released.connect(self.release_zr)
-        # self.BTN_r.released.connect(self.release_r)
-        # self.BTN_plus.released.connect(self.release_rclick)
-        # self.BTN_rs.released.connect(self.release_plus)
-        # self.BTN_a.released.connect(self.release_a)
-        # self.BTN_b.released.connect(self.release_b)
-        # self.BTN_x.released.connect(self.release_x)
-        # self.BTN_y.released.connect(self.release_y)
-        # self.BTN_home.released.connect(self.release_home)
-
-        # 各ボタンの関数割当
         self.pushButton_PythonStart.pressed.connect(self.start_command)
-        self.pushButton_PythonStop.pressed.connect(self.stop_command)
-
+        self.pushButton_PythonStop.pressed.connect(
+            lambda: self.stop_command(block=False)
+        )
         self.pushButton_MCUStart.pressed.connect(self.start_mcu_command)
         self.pushButton_MCUStop.pressed.connect(self.stop_mcu_command)
 
         self.pushButton_PythonReload.clicked.connect(self.reload_commands)
         self.pushButton_MCUReload.clicked.connect(self.reload_commands)
-
         self.pushButtonReloadPort.clicked.connect(self.activate_serial)
+
         self.pushButtonScreenShot.clicked.connect(self.screen_shot)
         self.toolButtonOpenScreenShotDir.clicked.connect(self.open_screen_shot_dir)
         self.toolButtonOpenPythonDir.clicked.connect(self.open_python_shot_dir)
         self.toolButton_OpenMCUDir.clicked.connect(self.open_mcu_shot_dir)
+        self.comboBoxCameraNames.currentIndexChanged.connect(
+            self.handle_camera_selection_changed
+        )
         self.tabWidget.currentChanged.connect(self.set_command_mode)
-        # GUIスティックの割当　(fpsが落ちるのでコントローラー推奨)
-        self.left_stick.stick_signal.connect(self.gui_stick_left, type=Qt.DirectConnection)
-        self.right_stick.stick_signal.connect(self.gui_stick_right, type=Qt.DirectConnection)
-
-        # 　各コンボボックス選択時の挙動
         self.tabWidget.currentChanged.connect(self.assign_command)
         self.comboBoxPython.currentIndexChanged.connect(self.assign_command)
         self.comboBox_MCU.currentIndexChanged.connect(self.assign_command)
 
-        # キャプチャ画像クリック時に座標を返すように
+        self.left_stick.stick_signal.connect(self.handle_gui_stick_left)
+        self.right_stick.stick_signal.connect(self.handle_gui_stick_right)
+
         self.CaptureImageArea.mousePressEvent = self.capture_mouse_press_event
 
-        # Setting.tomlへの保存
         self.lineEditFPS.textChanged.connect(self.assign_fps_to_setting)
         self.lineEditCameraID.textChanged.connect(self.assign_camera_id_to_setting)
         self.lineEditComPort.textChanged.connect(self.assign_com_port_to_setting)
-        self.comboBox_MCU.currentIndexChanged.connect(self.assign_mcu_command_to_setting)
-        self.comboBoxPython.currentIndexChanged.connect(self.assign_py_command_to_setting)
+        self.comboBox_MCU.currentIndexChanged.connect(
+            self.assign_mcu_command_to_setting
+        )
+        self.comboBoxPython.currentIndexChanged.connect(
+            self.assign_py_command_to_setting
+        )
 
         self.actionconnect.triggered.connect(self.reconnect_gamepad)
-        self.actionCOM_Port_ASSIST.triggered.connect(self.message_show_available_com_port)
-        # self.actionTemplateMatchSupport.triggered.connect(self.open_template_matching_support_tool)
+        self.actionCOM_Port_ASSIST.triggered.connect(
+            self.message_show_available_com_port
+        )
+        self.actionShow_Serial.triggered.connect(self.show_serial)
+        self.actionPauseController.triggered.connect(self.pause_controller)
 
-    def assign_fps_to_setting(self):
+        self._connect_controller_buttons()
+
+    def _connect_controller_buttons(self) -> None:
+        mapping = {
+            "BTN_zl": "ZL",
+            "BTN_l": "L",
+            "BTN_ls": "LCLICK",
+            "BTN_minus": "MINUS",
+            "BTN_up": "TOP",
+            "BTN_down": "BTM",
+            "BTN_left": "LEFT",
+            "BTN_right": "RIGHT",
+            "BTN_capture": "CAPTURE",
+            "BTN_zr": "ZR",
+            "BTN_r": "R",
+            "BTN_rs": "RCLICK",
+            "BTN_plus": "PLUS",
+            "BTN_a": "A",
+            "BTN_b": "B",
+            "BTN_x": "X",
+            "BTN_y": "Y",
+            "BTN_home": "HOME",
+        }
+        for widget_name, logical_name in mapping.items():
+            widget = getattr(self, widget_name, None)
+            if widget is None:
+                continue
+            widget.pressed.connect(
+                lambda name=logical_name: self.on_ui_button_pressed(name)
+            )
+            widget.released.connect(
+                lambda name=logical_name: self.on_ui_button_released(name)
+            )
+
+    # ------------------------------------------------------------------
+    # settings
+    # ------------------------------------------------------------------
+    def assign_fps_to_setting(self) -> None:
         self.setting.setting["main_window"]["must"]["fps"] = self.lineEditFPS.text()
 
-    def assign_camera_id_to_setting(self):
-        self.setting.setting["main_window"]["must"]["camera_id"] = self.lineEditCameraID.text()
+    def assign_camera_id_to_setting(self) -> None:
+        self.setting.setting["main_window"]["must"]["camera_id"] = (
+            self.lineEditCameraID.text()
+        )
 
-    def assign_com_port_to_setting(self):
-        self.setting.setting["main_window"]["must"]["com_port"] = self.lineEditComPort.text()
+    def assign_com_port_to_setting(self) -> None:
+        self.setting.setting["main_window"]["must"]["com_port"] = (
+            self.lineEditComPort.text()
+        )
 
-    def assign_window_size_to_setting(self):
-        self.setting.setting["main_window"]["must"]["com_port"] = self.lineEditComPort.text()
+    def assign_window_size_to_setting(self) -> None:
+        self.setting.setting["main_window"]["option"]["window_size_width"] = (
+            self.width()
+        )
+        self.setting.setting["main_window"]["option"]["window_size_height"] = (
+            self.height()
+        )
 
-    def assign_mcu_command_to_setting(self):
-        self.setting.setting["command"]["mcu_command"] = self.comboBox_MCU.itemText(self.comboBox_MCU.currentIndex())
+    def assign_mcu_command_to_setting(self) -> None:
+        self.setting.setting["command"]["mcu_command"] = self.comboBox_MCU.itemText(
+            self.comboBox_MCU.currentIndex()
+        )
 
-    def assign_py_command_to_setting(self):
-        self.setting.setting["command"]["py_command"] = self.comboBoxPython.itemText(self.comboBoxPython.currentIndex())
+    def assign_py_command_to_setting(self) -> None:
+        self.setting.setting["command"]["py_command"] = self.comboBoxPython.itemText(
+            self.comboBoxPython.currentIndex()
+        )
 
-    def resizeEvent(self, event: PySide6.QtGui.QResizeEvent) -> None:
-        self.setting.setting["main_window"]["option"]["window_size_width"] = self.width()
-        self.setting.setting["main_window"]["option"]["window_size_height"] = self.height()
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        self.assign_window_size_to_setting()
+        super().resizeEvent(event)
 
-    def set_command_mode(self):
-        if self.tabWidget.currentIndex() == 0:
-            self.command_mode = "python"
-        elif self.tabWidget.currentIndex() == 1:
-            self.command_mode = "mcu"
+    def set_settings(self) -> None:
+        try:
+            self.logger.debug("Load setting")
+            self.setting.load()
+        except FileNotFoundError:
+            self.logger.debug("File Not FoundGenerate setting")
+            self.setting.generate()
+            self.setting.load()
+
+        settings = self.setting.setting
+        if settings is None:
+            raise RuntimeError("Settings are not loaded.")
+
+        self.lineEditFPS.setText(str(settings["main_window"]["must"]["fps"]))
+        self.lineEditCameraID.setText(str(settings["main_window"]["must"]["camera_id"]))
+        self.lineEditComPort.setText(str(settings["main_window"]["must"]["com_port"]))
+        self.actionShow_Serial.setChecked(
+            settings["main_window"]["option"]["show_serial"]
+        )
+
+        self.keymap = {
+            v["assign"]: k
+            for k, v in settings["key_config"]["joystick"]["button"].items()
+            if v["state"]
+        } | {
+            v["assign"]: k
+            for k, v in settings["key_config"]["joystick"]["hat"].items()
+            if v["state"]
+        }
+
+    # ------------------------------------------------------------------
+    # serial / capture / gamepad controls
+    # ------------------------------------------------------------------
+    def activate_serial(self) -> None:
+        self.request_serial_close.emit()
+        self.request_serial_open.emit(
+            self.setting.setting["main_window"]["must"]["com_port"], ""
+        )
+
+    def on_serial_state_changed(self, opened: bool, label: str) -> None:
+        self._serial_open = opened
+        if opened:
+            self.logger.info(f"Serial connected: {label}")
         else:
-            raise Exception
+            self.logger.info("Serial disconnected")
 
-    @Slot(QImage, np.ndarray)
-    def update_image(self, image, frame):
+    def on_serial_error(self, message: str) -> None:
+        self.logger.error(message)
+
+    def reconnect_camera(self, cam_id: str) -> None:
         try:
-            self.img = image
-            self.frame = frame
-            pix = QPixmap.fromImage(self.img)
-            # pix.scaled(1280, 720, aspectMode=QtCore.Qt.KeepAspectRatio)
-            self.CaptureImageArea.setPixmap(pix)
-        except KeyboardInterrupt:
-            self.close()
-            # pass
+            self.request_capture_reopen.emit(int(cam_id))
+        except ValueError:
+            self.logger.error(f"Invalid camera id: {cam_id}")
 
-    @Slot(str)
-    def update_log(self, s):
-        # self.plainTextEdit.insertPlainText(s + "\n")
-        pass
-
-    @Slot(bool)
-    def img_recognition_return(self):
-        return self.img
-
-    @Slot(str)
-    def callback_run_macro(self, s):
-        self.ser.writeRow(s)
-
-    def reconnect_camera(self, cam_id):
-        self.capture_worker.open_camera(int(cam_id))
-
-    def activate_serial(self):
+    def reload_camera(self) -> None:
         try:
-            if self.ser.isOpened():
-                self.logger.debug("Port is already opened and being closed.")
-                self.ser.closeSerial()
-                self.keyPress = None
-                self.activate_serial()
-            else:
-                if self.ser.openSerial(self.setting.setting["main_window"]["must"]["com_port"], ""):
-                    self.logger.debug(
-                        "COM Port "
-                        + str(self.setting.setting["main_window"]["must"]["com_port"])
-                        + " connected successfully"
-                    )
-                    self.keyPress = KeyPress(self.ser)
-                else:
-                    self.logger.error(
-                        f'Cannot open COM Port: {self.setting.setting["main_window"]["must"]["com_port"]}')
+            self.request_capture_set_fps.emit(
+                int(self.setting.setting["main_window"]["must"]["fps"])
+            )
+        except Exception as exc:
+            self.logger.error(exc)
 
-        except:
-            self.logger.debug("Input Correct COM Port and Reload!")
-        pass
+    def reconnect_gamepad(self) -> None:
+        self.request_gamepad_reconnect.emit()
 
-    # Todo キーボード操作できるようにする
-    def activate_keyboard(self):
-        pass
+    def pause_controller(self) -> None:
+        paused = self.actionPauseController.isChecked()
+        if paused:
+            self.logger.info("コントローラ入力を一時停止します")
+        else:
+            self.logger.info("コントローラ入力を再開します")
+        self.request_gamepad_pause.emit(paused)
 
-    def load_commands(self):
-        self.py_loader = CommandLoader(ospath("Commands/Python"), CommandBase)  # コマンドの読み込み
+    def show_serial(self) -> None:
+        enabled = self.actionShow_Serial.isChecked()
+        self.setting.setting["main_window"]["option"]["show_serial"] = enabled
+        self.is_show_serial = enabled
+        self.request_serial_show.emit(enabled)
+
+    # ------------------------------------------------------------------
+    # commands
+    # ------------------------------------------------------------------
+    def load_commands(self) -> None:
+        self.py_loader = CommandLoader(ospath("Commands/Python"), CommandBase)
         self.mcu_loader = CommandLoader(ospath("Commands/MCU"), McuCommand)
+
         self.py_classes, py_error = self.py_loader.load()
         self.mcu_classes, mcu_error = self.mcu_loader.load()
-        if py_error is not []:
-            for k, v in py_error.items():
-                self.logger.error(f"Error while loading {k}\n"
-                                  # f">>> {(v[0])}\n"
-                                  f">>> {(v[1])}"
-                                  # f">>> {(v[2])}\n"
-                                  )
-        if mcu_error is not []:
-            for k, v in mcu_error.items():
-                self.logger.error(f"Error while loading {k}\n"
-                                  # f">>> {(v[0])}\n"
-                                  f">>> {(v[1])}"
-                                  # f">>> {(v[2])}\n"
-                                  )
 
-        # print(self.mcu_classes)
+        self._log_loader_errors(py_error)
+        self._log_loader_errors(mcu_error)
+
         self.set_command_items()
         self.assign_command()
 
-    def set_command_items(self):
-        for idx, v in enumerate([c[0].NAME for c in self.py_classes]):
-            self.comboBoxPython.addItem(v)
-            if (s := self.py_classes[idx][0]().__tool_tip__) is not None:
-                self.comboBoxPython.setItemData(idx, s, QtCore.Qt.ToolTipRole)
-                self.comboBoxPython.setItemData(idx, QColor(255, 0, 0), QtCore.Qt.ItemDataRole.ForegroundRole)
-        s = None
-        self.comboBoxPython.setCurrentIndex(0)
-        for v in [c[0].NAME for c in self.mcu_classes]:
-            self.comboBox_MCU.addItem(v)
-        self.comboBox_MCU.setCurrentIndex(0)
+    def _log_loader_errors(self, error_dict: dict) -> None:
+        if not error_dict:
+            return
+        for k, v in error_dict.items():
+            if len(v) >= 3:
+                self.logger.error(f"Error while loading {k}\n>>> {v[1]}\n{v[2]}")
+            else:
+                self.logger.error(f"Error while loading {k}\n>>> {v}")
 
-    def assign_command(self):
-        # 選択されているコマンドを取得する
-        self.mcu_cur_command = self.mcu_classes[self.comboBox_MCU.currentIndex()][0]  # MCUコマンドについて
+    def set_command_items(self) -> None:
+        self.comboBoxPython.clear()
+        self.comboBox_MCU.clear()
 
-        self.py_cur_command = self.py_classes[self.comboBoxPython.currentIndex()][0]
+        for idx, item in enumerate(self.py_classes):
+            cls = item[0]
+            self.comboBoxPython.addItem(cls.NAME)
+            tip = getattr(cls(), "__tool_tip__", None)
+            if tip is not None:
+                self.comboBoxPython.setItemData(idx, tip, QtCore.Qt.ToolTipRole)
+            self.comboBoxPython.setItemData(
+                idx, QColor(255, 0, 0), QtCore.Qt.ItemDataRole.ForegroundRole
+            )
+
+        for item in self.mcu_classes:
+            cls = item[0]
+            self.comboBox_MCU.addItem(cls.NAME)
+
+        if self.comboBoxPython.count() > 0:
+            self.comboBoxPython.setCurrentIndex(0)
+        if self.comboBox_MCU.count() > 0:
+            self.comboBox_MCU.setCurrentIndex(0)
+
+    def assign_command(self) -> None:
+        if self.mcu_classes and 0 <= self.comboBox_MCU.currentIndex() < len(
+            self.mcu_classes
+        ):
+            self.mcu_cur_command = self.mcu_classes[self.comboBox_MCU.currentIndex()][0]
+        else:
+            self.mcu_cur_command = None
+
+        if self.py_classes and 0 <= self.comboBoxPython.currentIndex() < len(
+            self.py_classes
+        ):
+            self.py_cur_command = self.py_classes[self.comboBoxPython.currentIndex()][0]
+        else:
+            self.py_cur_command = None
 
         if self.tabWidget.currentIndex() == 0:
             self.cur_command = self.py_cur_command
         else:
             self.cur_command = self.mcu_cur_command
 
-    def reload_commands(self):
-        # 表示しているタブを読み取って、どのコマンドを表示しているか取得、リロード後もそれが選択されるようにする
+    def _sync_command_buttons(self) -> None:
+        python_running = (
+            self.command_runtime is not None and self.command_runtime.is_running()
+        )
+        mcu_running = getattr(self, "_mcu_command", None) is not None
+
+        self.pushButton_PythonStart.setEnabled(not python_running)
+        self.pushButton_PythonStop.setEnabled(python_running)
+
+        self.pushButton_MCUStart.setEnabled(not mcu_running)
+        self.pushButton_MCUStop.setEnabled(mcu_running)
+
+    def set_command_mode(self) -> None:
+        if self.tabWidget.currentIndex() == 0:
+            self.command_mode = "python"
+        elif self.tabWidget.currentIndex() == 1:
+            self.command_mode = "mcu"
+        else:
+            raise Exception("Unknown command mode")
+
+    def start_command(self) -> None:
+
+        if (
+            self.command_runtime is None
+            or self.serial_worker is None
+            or self.capture_worker is None
+        ):
+            self.logger.error("Command runtime is not ready.")
+            return
+        if self.cur_command is None:
+            self.logger.error("No command is selected.")
+            return
+
+        self.stop_command(block=True)
+        self.request_gamepad_pause.emit(True)
+        self.request_capture_frame_stream.emit(True)
+
+        started = self.command_runtime.start(
+            self.cur_command, self.serial_worker, self.capture_worker
+        )
+        if not started:
+            self.request_gamepad_pause.emit(False)
+            self.request_capture_frame_stream.emit(False)
+
+        self._sync_command_buttons()
+
+    def on_command_started(self, name: str) -> None:
+        self.logger.info(f"Command started: {name}")
+
+    def stop_command(self, block: bool = False) -> None:
+        if self.command_runtime is None or not self.command_runtime.is_running():
+            self.request_capture_frame_stream.emit(False)
+            self._sync_command_buttons()
+            return
+
+        self.logger.debug("Send stop request to command runtime.")
+        self.command_runtime.stop(block=block)
+        self.request_capture_frame_stream.emit(False)
+        self._sync_command_buttons()
+
+    def on_command_stopped(self, result: bool) -> None:
+
+        _ = result
+        self.request_gamepad_pause.emit(False)
+        self.request_capture_frame_stream.emit(False)
+        self._sync_command_buttons()
+
+    def start_mcu_command(self) -> None:
+
+        self.assign_command()
+        if self.cur_command is None:
+            self.logger.error("No MCU command is selected.")
+            return
+
+        self._mcu_command = self.cur_command()
+        self._mcu_command.play_sync_name.connect(
+            self.play_mcu, Qt.ConnectionType.QueuedConnection
+        )
+        self._mcu_command.start()
+
+        self._sync_command_buttons()
+
+    def stop_mcu_command(self) -> None:
+
+        if getattr(self, "_mcu_command", None) is None:
+            self._sync_command_buttons()
+            return
+
+        self._mcu_command.end()
+        self._mcu_command.play_sync_name.disconnect()
+        self._mcu_command = None
+
+        self._sync_command_buttons()
+
+    @Slot(str)
+    def play_mcu(self, s: str) -> None:
+        self.request_serial_write.emit(s, False)
+
+    def reload_commands(self) -> None:
+        self.stop_command(block=True)
+
         old_val_mcu = self.comboBox_MCU.itemText(self.comboBox_MCU.currentIndex())
         old_val_py = self.comboBoxPython.itemText(self.comboBoxPython.currentIndex())
-        # print(old_val_mcu)
-
-        self.comboBox_MCU.clear()
-        self.comboBoxPython.clear()
 
         self.py_classes, py_reload_error = self.py_loader.reload()
         self.mcu_classes, mcu_reload_error = self.mcu_loader.reload()
 
-        # Restore the command selecting state if possible
         self.set_command_items()
-        if self.comboBox_MCU.findText(old_val_mcu) != -1:
-            self.comboBox_MCU.setCurrentIndex(self.comboBox_MCU.findText(old_val_mcu))
-        else:
+
+        mcu_idx = self.comboBox_MCU.findText(old_val_mcu)
+        if mcu_idx != -1:
+            self.comboBox_MCU.setCurrentIndex(mcu_idx)
+        elif self.comboBox_MCU.count() > 0:
             self.comboBox_MCU.setCurrentIndex(0)
 
-        if self.comboBoxPython.findText(old_val_py) != -1:
-            self.comboBoxPython.setCurrentIndex(self.comboBoxPython.findText(old_val_py))
-        else:
+        py_idx = self.comboBoxPython.findText(old_val_py)
+        if py_idx != -1:
+            self.comboBoxPython.setCurrentIndex(py_idx)
+        elif self.comboBoxPython.count() > 0:
             self.comboBoxPython.setCurrentIndex(0)
+
         self.assign_command()
-        if py_reload_error is {} and mcu_reload_error is {}:
+
+        if not py_reload_error and not mcu_reload_error:
             self.logger.info("Reloaded commands.")
-        elif py_reload_error:
-            for k, v in py_reload_error.items():
-                # k, v = s.items()
-                # print(v[0])
-                self.logger.error(f"Error while loading {k}\n"
-                                  # f">>> {(v[0])}\n"
-                                  f">>> {(v[1])}"
-                                  # f">>> {(v[2])}\n"
-                                  )
-        elif mcu_reload_error:
-            for k, v in mcu_reload_error.items():
-                self.logger.error(f"Error while loading {k}\n"
-                                  # f">>> {(v[0])}\n"
-                                  f">>> {(v[1])}"
-                                  # f">>> {(v[2])}\n"
-                                  )
-
-    def reload_camera(self):
-        self.capture_worker.set_fps(self.setting.setting["main_window"]["must"]["fps"])
-        pass
-
-    def screen_shot(self):
-        try:
-            self.capture_worker.saveCapture(capture_dir=self.cur_command.CAPTURE_DIR)
-        except Exception as e:
-            self.logger.error(e)
-            pass
-        pass
-
-    def show_serial(self):
-        if self.actionShow_Serial.isChecked():
-            self.setting.setting["main_window"]["option"]["show_serial"] = True
-            self.ser.is_show_serial = True
         else:
-            self.setting.setting["main_window"]["option"]["show_serial"] = False
-            self.ser.is_show_serial = False
-        pass
+            self._log_loader_errors(py_reload_error)
+            self._log_loader_errors(mcu_reload_error)
 
-    def pause_controller(self):
-        if self.actionPauseController.isChecked():
-            # self.setting.setting["main_window"]["option"]["pause_controller"] = True
-            self.logger.info("コントローラ入力を一時停止します")
-            self.GamepadController_worker.pause = True
-        else:
-            # self.setting.setting["main_window"]["option"]["pause_controller"] = False
-            self.logger.info("コントローラ入力を再開します")
-            self.GamepadController_worker.pause = False
-        pass
+    # ------------------------------------------------------------------
+    # UI/gamepad/button handling
+    # ------------------------------------------------------------------
+    def on_ui_button_pressed(self, name: str) -> None:
+        self._set_button_checked(name, True)
+        self.request_serial_button_pressed.emit(name)
 
-    def capture_mouse_press_event(self, event):
-        if event.modifiers() & QtCore.Qt.ControlModifier:  # Ctrlキーが押されているなら
-            w = self.CaptureImageArea.width()
-            h = self.CaptureImageArea.height()
-            x = event.position().x()
-            x_ = int(x * 1280 / w)
-            y = event.position().y()
-            y_ = int(y * 720 / h)
-            c = self.img.pixel(x_, y_)
-            # c_qobj = QColor
-            c_rgb = QColor(c).getRgb()
-            self.logger.debug(f"Clicked at x:{x_} y:{y_}, R:{c_rgb[0]} G:{c_rgb[1]} B: {c_rgb[2]}")
-            return x, y, c_rgb
+    def on_ui_button_released(self, name: str) -> None:
+        self._set_button_checked(name, False)
+        self.request_serial_button_released.emit(name)
 
-    def open_screen_shot_dir(self):
-        os.startfile(os.path.realpath(self.cur_command.CAPTURE_DIR))
+    @Slot(int)
+    def handle_camera_selection_changed(self, index: int) -> None:
+        if not hasattr(self, "camera_list"):
+            return
+        if index < 0 or index >= len(self.camera_list):
+            return
 
-    def open_python_shot_dir(self):
-        os.startfile(os.path.realpath(Path(self.cur_command.__directory__).resolve().parent))
+        selected = self.camera_list[index]
+        cam_index = int(selected["index"])
 
-    def open_mcu_shot_dir(self):
-        os.startfile(os.path.realpath(self.cur_command.__directory__))
+        self.lineEditCameraID.setText(str(cam_index))
+        self.request_capture_reopen.emit(cam_index)
 
-    def start_command(self):
-        if self.GamepadController_worker is not None:
-            self.GamepadController_worker.pause = True
-        self.assign_command()
-        self.pushButton_PythonStart.setEnabled(False)
-        # if self.thread_2 is not None:
-        self.stop_command()
-        if self.thread_2 is None:
-            self.thread_2 = QThread()
-        self.worker = self.cur_command()
+        self.logger.info(f"Selected camera: {selected['name']} (index={cam_index})")
 
-        self.worker.moveToThread(self.thread_2)
+    @Slot(str)
+    def handle_gamepad_button_pressed(self, name: str) -> None:
+        self._set_button_checked(name, True)
+        self.request_serial_button_pressed.emit(name)
 
-        self.worker.print_strings.connect(self.callback_string_to_log, type=Qt.QueuedConnection)
-        self.stop_request.connect(self.worker.stop, type=Qt.QueuedConnection)
-        self.worker.stop_function.connect(self.callback_stop_command, type=Qt.QueuedConnection)
+    @Slot(str)
+    def handle_gamepad_button_released(self, name: str) -> None:
+        self._set_button_checked(name, False)
+        self.request_serial_button_released.emit(name)
 
-        self.worker.serial_input.connect(self.callback_keypress, type=Qt.DirectConnection)
-        self.worker.get_image.connect(self.callback_return_img, type=Qt.DirectConnection)
-        self.worker.recognize_rect.connect(self.callback_show_recognize_rect, type=Qt.DirectConnection)
-        self.capture_worker.send_img.connect(self.worker.callback_receive_img, type=Qt.DirectConnection)
-        self.worker.line_txt.connect(self.callback_line_txt, type=Qt.DirectConnection)
-        self.worker.line_img.connect(self.callback_line_img, type=Qt.DirectConnection)
-        self.worker.send_serial.connect(self.callback_run_macro, type=Qt.DirectConnection)
+    @Slot(float, float, float, float)
+    def handle_gamepad_axis_moved(
+        self,
+        left_horizontal: float,
+        left_vertical: float,
+        right_horizontal: float,
+        right_vertical: float,
+    ) -> None:
+        self.stickMoveEvent(
+            left_horizontal, left_vertical, right_horizontal, right_vertical
+        )
+        self.request_serial_axis.emit(
+            left_horizontal, left_vertical, right_horizontal, right_vertical
+        )
 
-        self.thread_2.started.connect(self.worker.run)
+    def _set_button_checked(self, name: str, checked: bool) -> None:
+        mapping = {
+            "ZL": "BTN_zl",
+            "L": "BTN_l",
+            "LCLICK": "BTN_ls",
+            "MINUS": "BTN_minus",
+            "TOP": "BTN_up",
+            "BTM": "BTN_down",
+            "LEFT": "BTN_left",
+            "RIGHT": "BTN_right",
+            "CAPTURE": "BTN_capture",
+            "ZR": "BTN_zr",
+            "R": "BTN_r",
+            "RCLICK": "BTN_rs",
+            "PLUS": "BTN_plus",
+            "A": "BTN_a",
+            "B": "BTN_b",
+            "X": "BTN_x",
+            "Y": "BTN_y",
+            "HOME": "BTN_home",
+        }
+        widget_name = mapping.get(name)
+        if widget_name is None:
+            return
+        widget = getattr(self, widget_name, None)
+        if widget is not None:
+            widget.setChecked(checked)
 
-        self.thread_2.finished.connect(self.worker.deleteLater)
-        self.thread_2.finished.connect(self.thread_2.deleteLater)
-        if self.worker is not None:
-            try:
-                self.worker.__post_init__()
-            except:
-                ...
-        self.thread_2.start()
+    @Slot(float, float)
+    def handle_gui_stick_left(self, angle: float, r: float) -> None:
+        self.gui_stick_store.set_left(float(angle), float(r))
 
-    @staticmethod
-    def callback_start_command(self, is_alive: bool):
+    @Slot(float, float)
+    def handle_gui_stick_right(self, angle: float, r: float) -> None:
+        self.gui_stick_store.set_right(float(angle), float(r))
+
+    def stickMoveEvent(
+        self, left_horizontal, left_vertical, right_horizontal, right_vertical
+    ) -> None:
         try:
-            if is_alive:
-                # print("ALIVE")
-                pass
+            left_angle = math.atan2(left_vertical, left_horizontal)
+            left_r = math.sqrt(left_vertical**2 + left_horizontal**2)
+            right_angle = math.atan2(right_vertical, right_horizontal)
+            right_r = math.sqrt(right_vertical**2 + right_horizontal**2)
+
+            dead_zone = 0.35
+            if left_r < dead_zone:
+                left_r = 0
             else:
-                # print("DEAD")
-                pass
+                left_r = (left_r - dead_zone) / (1 - dead_zone)
 
-        except Exception as e:
-            print(e)
-        pass
+            if right_r < dead_zone:
+                right_r = 0
+            else:
+                right_r = (right_r - dead_zone) / (1 - dead_zone)
 
-    def stop_command(self):
-        if self.thread_2 and shiboken6.isValid(self.thread_2):
-            self.logger.debug("Send Stop Requests.")
-            # self.stop_request.emit(True)
-            # スレッドが作成されていて、削除されていない
-            if self.thread_2.isRunning() or not self.thread_2.isFinished():
-                # self.worker.get_image.disconnect()
-                # print("thread is stopping")
-                self.worker.stop()
-                self.thread_2.quit()
-                self.thread_2.wait()
-                # print("thread is stopped")
-                self.worker = None
-                self.thread_2 = None
-                try:
-                    self.GamepadController_worker.is_alive = True
-                    self.GamepadController_worker.pause = False
-                except:
-                    self.logger.error("ERROR")
-                # self.callback_stop_command()
+            self.left_stick.stickMoveEvent(left_r, left_angle)
+            self.right_stick.stickMoveEvent(right_r, right_angle)
+        except KeyboardInterrupt:
+            self.close()
 
-    def start_mcu_command(self):
-        self.assign_command()
-        self.pushButton_MCUStart.setEnabled(False)
-        self.pushButton_MCUStop.setEnabled(True)
-        self._mcu_command = self.cur_command()
-        self._mcu_command.play_sync_name.connect(self.play_mcu)
-        self._mcu_command.start()
-        pass
+    def gamepad_l_stick(self) -> None:
 
-    def stop_mcu_command(self):
-        self._mcu_command.end()
-        self._mcu_command.play_sync_name.disconnect()
-        self._mcu_command = None
-        self.pushButton_MCUStart.setEnabled(True)
-        self.pushButton_MCUStop.setEnabled(False)
+        enabled = bool(
+            self.setting.setting["key_config"]["joystick"]["direction"]["LStick"]
+        )
+        self.request_gamepad_set_l_stick.emit(enabled)
 
-    def play_mcu(self, s):
-        self.ser.writeRow(s)
-        pass
+    def gamepad_r_stick(self) -> None:
 
-    @Slot(str, type(logging.DEBUG))
+        enabled = bool(
+            self.setting.setting["key_config"]["joystick"]["direction"]["RStick"]
+        )
+        self.request_gamepad_set_r_stick.emit(enabled)
+
+    # ------------------------------------------------------------------
+    # image / logging / utility
+    # ------------------------------------------------------------------
+
+    @Slot(str, int)
     def callback_string_to_log(self, s, level) -> None:
         match level:
             case logging.DEBUG:
@@ -1350,175 +954,182 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.logger.critical(s)
             case logging.FATAL:
                 self.logger.fatal(s)
+            case _:
+                self.logger.info(s)
 
-    @Slot(str, str)
-    def callback_line_txt(self, s, token_key) -> None:
-        self.line_notify.send_text(s, token_key=token_key)
-        ...
+    def screen_shot(self) -> None:
+        try:
+            capture_dir = (
+                self.cur_command.CAPTURE_DIR
+                if self.cur_command is not None
+                else "./ScreenShot"
+            )
+            self.request_capture_save.emit(None, None, None, None, capture_dir)
+        except Exception as exc:
+            self.logger.error(exc)
 
-    @Slot(str, str, np.ndarray)
-    def callback_line_img(self, s, token_key, img) -> None:
-        self.line_notify.send_text_n_image(img, s, token_key=token_key)
-        ...
+    def capture_mouse_press_event(self, event) -> None:
+        if self.img is None:
+            return
+        if event.modifiers() & QtCore.Qt.ControlModifier:
+            w = self.CaptureImageArea.width()
+            h = self.CaptureImageArea.height()
+            x = event.position().x()
+            x_ = int(x * 1280 / w)
+            y = event.position().y()
+            y_ = int(y * 720 / h)
+            c = self.img.pixel(x_, y_)
+            c_rgb = QColor(c).getRgb()
+            self.logger.debug(
+                f"Clicked at x:{x_} y:{y_}, R:{c_rgb[0]} G:{c_rgb[1]} B: {c_rgb[2]}"
+            )
+            return x, y, c_rgb
 
-    def callback_stop_command(self):
-        self.pushButton_PythonStart.setEnabled(True)
-        self.ser.writeRow("end")
-        self.stop_command()
-        pass
+    def open_screen_shot_dir(self) -> None:
+        target = os.path.realpath(
+            self.cur_command.CAPTURE_DIR
+            if self.cur_command is not None
+            else "./ScreenShot"
+        )
+        self._open_path(target)
 
-    def open_python_commands_dir(self):
-        pass
+    def open_python_shot_dir(self) -> None:
+        if self.cur_command is None:
+            return
+        self._open_path(
+            os.path.realpath(Path(self.cur_command.__directory__).resolve().parent)
+        )
 
-    def open_mcu_commands_dir(self):
-        pass
+    def open_mcu_shot_dir(self) -> None:
+        if self.cur_command is None:
+            return
+        self._open_path(os.path.realpath(self.cur_command.__directory__))
 
-    @Slot(type(Button.A), float, float)
-    def callback_keypress(self, buttons, duration: float = 0.1, wait: float = 0.1, input_type: str = None):
-        if self.keyPress is not None:
-            match input_type:
-                case "press":
-                    self.keyPress.input(buttons)
-                    self.wait(duration)
-                    self.keyPress.inputEnd(buttons)
-                    self.wait(wait)
-                case "press_w/o_wait":
-                    self.keyPress.input(buttons, overwrite=True)
-                    self.wait(duration)
-                case "hold":
-                    self.keyPress.hold(buttons)
-                    self.wait(duration)
-                case "hold end":
-                    self.keyPress.holdEnd(buttons)
-                case "release":
-                    self.keyPress.inputEnd(buttons)
-                case "release_all":
-                    # self.ser.writeRow("3 8 80 80 80 80")
-                    self.keyPress.format.resetAllButtons()
-                    self.keyPress.format.unsetHat()
-                    self.keyPress.format.resetAllDirections()
-                    self.keyPress.input([])
-                case _:
-                    self.logger.error("Something seems to have gone wrong.\nPlease send info to the developer.")
+    def _open_path(self, target: str) -> None:
+        try:
+            if hasattr(os, "startfile"):
+                os.startfile(target)
+            else:
+                self.logger.info(f"Open path manually: {target}")
+        except Exception as exc:
+            self.logger.error(exc)
 
     @staticmethod
-    def wait(wait):
-        if float(wait) > 0.1:
-            time.sleep(wait)
-        else:
-            current_time = time.perf_counter()
-            while time.perf_counter() < current_time + wait:
-                pass
-
-    def callback_return_img(self):
-        self.capture_worker.callback_return_img(True)
-        pass
-
-    def set_settings(self):
-
-        try:
-            self.logger.debug("Load setting")
-            self.setting.load()
-        except FileNotFoundError:
-            self.logger.debug("File Not Found" "Generate setting")
-            self.setting.generate()
-            self.setting.load()
-
-        self.lineEditFPS.setText(str(self.setting.setting["main_window"]["must"]["fps"]))
-        self.lineEditCameraID.setText(str(self.setting.setting["main_window"]["must"]["camera_id"]))
-        self.lineEditComPort.setText(str(self.setting.setting["main_window"]["must"]["com_port"]))
-        self.actionShow_Serial.setChecked(self.setting.setting["main_window"]["option"]["show_serial"])
-
-        self.keymap = {
-                          v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["button"].items() if
-                          v["state"]
-                      } | {v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["hat"].items() if
-                           v["state"]}
-
-    def closeEvent(self, event: PySide6.QtGui.QCloseEvent) -> None:
-        # Windowが最大化されていたら記憶する
-        if self.isMaximized():
-            self.setting.setting["main_window"]["option"]["window_showMaximized"] = True
-        else:
-            self.setting.setting["main_window"]["option"]["window_showMaximized"] = False
-        self.setting.setting["command"]["py_command"] = self.comboBoxPython.currentText()
-        self.setting.setting["command"]["mcu_command"] = self.comboBox_MCU.currentText()
-
-        self.setting.save()
-        if self.template_matching_support_tool is not None:
-            self.template_matching_support_tool.close()
-
-        try:
-            if self.thread_1 is not None:
-                self.thread_1.terminate()
-            if self.thread_2 is not None:
-                self.thread_2.terminate()
-            self.GamepadController_worker.p.terminate()
-            self.GamepadController_worker.p.join()
-        except Exception:
-            pass
-        try:
-            if self.GamepadController_worker is not None:
-                self.GamepadController_worker.stop()
-                self.GamepadController_worker.p.terminate()
-                self.GamepadController_worker.p.join()
-            if self.GamepadController_thread is not None:
-                self.GamepadController_thread.terminate()
-        except Exception as e:
-            # print(000, e)
-            pass
-
-        self.logger.debug("Save settings")
-        print("Save settings")
-        return super().closeEvent(event)
-
-    def callback_show_recognize_rect(self, t1: tuple, t2: tuple, color: QColor, frames: int = 120):
-        if self.capture_worker is not None:
-            self.capture_worker.rect_list.append([t1[0], t1[1], t2[0], t2[1], color, frames])
-
-    @staticmethod
-    def message_show_available_com_port():
+    def message_show_available_com_port() -> None:
         ls = serial_ports()
-        ret = QMessageBox.information(None,
-                                      "利用可能なCOMポート",
-                                      f"利用可能なCOMポートは\n{','.join(ls)}\nです。",
-                                      QMessageBox.Ok)
+        QMessageBox.information(
+            None,
+            "利用可能なCOMポート",
+            f"利用可能なCOMポートは\n{','.join(ls)}\nです。",
+            QMessageBox.Ok,
+        )
 
-    def open_template_matching_support_tool(self):
+    def open_template_matching_support_tool(self) -> None:
         self.logger.debug("テンプレートマッチ補助ツール")
         if self.template_matching_support_tool is None:
             self.template_matching_support_tool = TemplateMatchSupport()
-            self.template_matching_support_tool.get_image.connect(self.callback_set_template_matching_support_tool)
-            self.template_matching_support_tool.graphicsView.template_matching.connect(self.callback_template_matching)
-            self.template_matching_support_tool.print_strings.connect(self.callback_string_to_log,
-                                                                      type=Qt.QueuedConnection)
+            self.template_matching_support_tool.get_image.connect(
+                self.callback_set_template_matching_support_tool
+            )
+            self.template_matching_support_tool.graphicsView.template_matching.connect(
+                self.callback_template_matching
+            )
+            self.template_matching_support_tool.print_strings.connect(
+                self.callback_string_to_log, Qt.ConnectionType.QueuedConnection
+            )
         self.template_matching_support_tool.show()
 
     @Slot()
-    def callback_set_template_matching_support_tool(self):
-        if self.template_matching_support_tool is not None:
-            self.template_matching_support_tool.image = copy.deepcopy(self.frame)
-            self.logger.debug("Set Image to tool.")
+    def callback_set_template_matching_support_tool(self) -> None:
+        if self.template_matching_support_tool is None:
+            return
+
+        frame = self.frame_store.latest_raw_copy()
+        if frame is None:
+            self.logger.warning("No latest raw frame available for template tool.")
+            return
+
+        self.template_matching_support_tool.image = copy.deepcopy(frame)
+        self.logger.debug("Set Image to tool.")
 
     @Slot()
-    def callback_template_matching(self):
+    def callback_template_matching(self) -> None:
         if self.template_matching_support_tool is not None:
             self.template_matching_support_tool.create_scene(get_img=False)
+
+    # ------------------------------------------------------------------
+    # shutdown
+    # ------------------------------------------------------------------
+    def closeEvent(self, event: QCloseEvent) -> None:
+
+        settings = self.setting.setting
+        if settings is None:
+            raise RuntimeError("Settings are not loaded.")
+
+        if self.preview_timer is not None:
+            self.preview_timer.stop()
+        if self.isMaximized():
+            settings["main_window"]["option"]["window_showMaximized"] = True
+        else:
+            settings["main_window"]["option"]["window_showMaximized"] = False
+
+        settings["command"]["py_command"] = self.comboBoxPython.currentText()
+        settings["command"]["mcu_command"] = self.comboBox_MCU.currentText()
+
+        if self.template_matching_support_tool is not None:
+            self.template_matching_support_tool.close()
+
+        # 1. UIから新規操作を止める
+        self.setEnabled(False)
+
+        # 2. command stop
+        self.stop_command(block=True)
+        self.request_capture_frame_stream.emit(False)
+
+        # 3. gamepad stop
+        self.request_gamepad_pause.emit(True)
+        self.request_gamepad_stop.emit()
+
+        # 4. capture stop
+        self.request_capture_stop.emit()
+
+        # 5. line worker は omit のためなし
+
+        # 6. serial close
+        self.request_serial_close.emit()
+
+        # 7. thread quit/wait
+        if self.gamepad_thread is not None:
+            self.gamepad_thread.quit()
+            self.gamepad_thread.wait(3000)
+
+        if self.capture_thread is not None:
+            self.capture_thread.quit()
+            self.capture_thread.wait(3000)
+
+        if self.serial_thread is not None:
+            self.serial_thread.quit()
+            self.serial_thread.wait(3000)
+
+        # 8. 設定保存
+        self.setting.save()
+        self.logger.debug("Save settings")
+
+        super().closeEvent(event)
 
 
 if __name__ == "__main__":
     logger = logging.Logger(__name__)
-    # 環境変数にPySide6を登録
+
     dirname = os.path.dirname(PySide6.__file__)
     pluginPath = os.path.join(dirname, "plugins", "platforms")
     os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = pluginPath
 
     try:
-        with open("ui/style.qss", "r") as f:
+        with open("ui/style.qss", "r", encoding="utf-8") as f:
             style = f.read()
-    except:
+    except Exception:
         style = ""
-    # print(style)
 
     try:
         app = QApplication(sys.argv)
@@ -1527,7 +1138,5 @@ if __name__ == "__main__":
         window.show()
         sys.exit(app.exec())
     except Exception as e:
-        # app = None
         logger.exception(e)
-
-    print("quit")
+        print("quit")

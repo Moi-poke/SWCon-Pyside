@@ -1,55 +1,138 @@
+from __future__ import annotations
+
 import importlib
 import inspect
 import os
 import sys
-from glob import glob
-from os.path import join, relpath
-from logging import getLogger, DEBUG, NullHandler
+import traceback
+from logging import NullHandler, getLogger
+from pathlib import Path
+from types import ModuleType
+from typing import Sequence
 
 logger = getLogger(__name__)
 logger.addHandler(NullHandler())
-logger.setLevel(DEBUG)
 logger.propagate = True
 
 
 def ospath(path: str) -> str:
-    return path.replace('/', os.sep)
+    """Normalize a filesystem path."""
+    return os.path.normpath(path)
 
 
-# Show all file names under the directory
-def browseFileNames(path: str = '.', ext: str = '', recursive: bool = True, name_only: bool = True) -> list:
-    search_path = join(path, '**') if recursive else path
-    search_path = join(search_path, '*' + ext)
+def browseFileNames(
+    path: str = ".",
+    ext: str = "",
+    recursive: bool = True,
+    name_only: bool = True,
+) -> list[str]:
+    """
+    List file names under a directory.
+
+    Parameters
+    ----------
+    path:
+        Base directory.
+    ext:
+        File extension filter, e.g. '.py'. Empty means all files.
+    recursive:
+        Whether to search recursively.
+    name_only:
+        If True, return path relative to `path`. Otherwise return absolute paths.
+    """
+    base = Path(path).resolve()
+    if not base.exists():
+        return []
+
+    pattern = f"**/*{ext}" if recursive else f"*{ext}"
+    files = sorted([p for p in base.glob(pattern) if p.is_file()])
 
     if name_only:
-        return [relpath(f, path) for f in glob(search_path, recursive=recursive)]
+        return [os.path.relpath(str(p), str(base)) for p in files]
+    return [str(p) for p in files]
+
+
+def getClassesInModule(module: ModuleType) -> list[type]:
+    """Return classes defined in the target module itself."""
+    return [
+        cls
+        for _, cls in inspect.getmembers(module, inspect.isclass)
+        if cls.__module__ == module.__name__
+    ]
+
+
+def getModuleNames(base_path: str) -> list[str]:
+    """
+    Convert Python files under `base_path` into importable module names.
+
+    Example
+    -------
+    base_path = '/project/Commands/Python'
+    file      = '/project/Commands/Python/foo/bar.py'
+    returns   = 'Commands.Python.foo.bar'
+    """
+    base = Path(base_path).resolve()
+    if not base.exists():
+        return []
+
+    # project root (/project) を import root にする
+    if len(base.parents) >= 2:
+        import_root = base.parents[1]
     else:
-        return glob(search_path, recursive=recursive)
+        import_root = base.parent
+
+    import_root_str = str(import_root)
+    if import_root_str not in sys.path:
+        sys.path.insert(0, import_root_str)
+
+    modules: list[str] = []
+    for py_file in sorted(base.rglob("*.py")):
+        if py_file.name == "__init__.py":
+            continue
+        rel = py_file.relative_to(import_root).with_suffix("")
+        modules.append(".".join(rel.parts))
+    return modules
 
 
-def getClassesInModule(module) -> list:
-    classes = []
-    for members in inspect.getmembers(module, inspect.isclass):
-        classes.append(members[1])
-    return classes
+def import_all_modules(
+    base_path: str,
+    mod_names: str | Sequence[str] | None = None,
+) -> tuple[list[ModuleType], dict[str, list[str]]]:
+    """
+    Import all modules or a subset of modules.
 
+    Returns
+    -------
+    modules:
+        Imported module list.
+    error_dict:
+        {
+            module_name: [exception_type_name, exception_message, traceback_string]
+        }
+    """
+    importlib.invalidate_caches()
+    if mod_names is None:
+        target_names = getModuleNames(base_path)
+    elif isinstance(mod_names, str):
+        target_names = [mod_names]
+    else:
+        target_names = list(mod_names)
 
-def getModuleNames(base_path: str) -> list:
-    filenames = browseFileNames(path=base_path, ext='.py', name_only=False)
-    return [name[:-3].replace(os.sep, '.') for name in filenames]
+    target_names = sorted(set(target_names))
 
+    modules: list[ModuleType] = []
+    error_dict: dict[str, list[str]] = {}
 
-def import_all_modules(base_path: str, mod_names: str | list = None) -> (list, list[dict[str, str]]):
-    modules = []
-    error_dict = {}
-    for name in getModuleNames(base_path) if mod_names is None else mod_names:
+    for name in target_names:
         try:
-            logger.debug(f"Import module: {name}")
+            logger.debug("Import module: %s", name)
             modules.append(importlib.import_module(name))
-        except Exception:
-            type_, value_, traceback_ = sys.exc_info()
-            error_dict |= {name: [type_, value_, traceback_]}
-            # logger.exception(e)
-            pass
+        except Exception as exc:
+            error_dict[name] = [
+                type(exc).__name__,
+                str(exc),
+                traceback.format_exc(),
+            ]
+            logger.exception("Failed to import module: %s", name)
 
     return modules, error_dict

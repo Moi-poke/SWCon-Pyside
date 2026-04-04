@@ -15,10 +15,21 @@ import shiboken6
 from PySide6 import QtCore, QtWidgets, QtGui
 from PySide6.QtCore import QSize, Qt, QThread, Signal, Slot, QPoint, QRect, QRectF
 from PySide6.QtGui import QColor, QImage, QPainter, QPen, QPixmap
-from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox, QWidget, QVBoxLayout, QLabel, QDialog, \
-    QHBoxLayout, QGraphicsView, QFileDialog, QButtonGroup
+from PySide6.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QMessageBox,
+    QWidget,
+    QVBoxLayout,
+    QLabel,
+    QDialog,
+    QHBoxLayout,
+    QGraphicsView,
+    QFileDialog,
+    QButtonGroup,
+)
 
-from ui.template_match_support import Ui_Form
+from ui.template_match_support_ui import Ui_Form
 
 
 class TemplateMatchSupport(QWidget, Ui_Form):
@@ -61,8 +72,12 @@ class TemplateMatchSupport(QWidget, Ui_Form):
         self.radioGroup.addButton(self.radioButton_3, ColorType.BINARY.value)
         self.radioGroup.buttonClicked.connect(self.img_color_setting)
 
-        self.horizontalSliderThreshold.valueChanged.connect(lambda: self.create_scene(get_img=False))
-        self.checkBoxSetOtsu.stateChanged.connect(lambda: self.create_scene(get_img=False))
+        self.horizontalSliderThreshold.valueChanged.connect(
+            lambda: self.create_scene(get_img=False)
+        )
+        self.checkBoxSetOtsu.stateChanged.connect(
+            lambda: self.create_scene(get_img=False)
+        )
         self.pushButtonLoadTemplate.pressed.connect(self.load_template_image)
         self.pushButtonSaveImg.pressed.connect(self.save_select_area)
         self.horizontalSlider.valueChanged.connect(self.set_slide_bar_to_threshold)
@@ -85,40 +100,54 @@ class TemplateMatchSupport(QWidget, Ui_Form):
             h, w, ch = self.image.shape
             bytes_per_line = ch * w
             self.match_img = self.image
-            self.show_image = QImage(self.image, w, h, bytes_per_line, QImage.Format.Format_BGR888)
+            self.show_image = QImage(
+                self.image, w, h, bytes_per_line, QImage.Format.Format_BGR888
+            )
             pass
         elif self.pixmap_mode == "Gray Scale":
             self.show_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
             h, w = self.show_image.shape
             self.match_img = self.show_image
-            self.show_image = QImage(self.show_image, w, h, QImage.Format.Format_Grayscale8)
+            self.show_image = QImage(
+                self.show_image, w, h, QImage.Format.Format_Grayscale8
+            )
         elif self.pixmap_mode == "Binarization":
             self.show_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
             h, w = self.show_image.shape
 
             if self.checkBoxSetOtsu.isChecked():
                 # self.debug("Auto has selected")
-                self.threshold, self.show_image = cv2.threshold(self.show_image, 0, 255, cv2.THRESH_OTSU)
+                self.threshold, self.show_image = cv2.threshold(
+                    self.show_image, 0, 255, cv2.THRESH_OTSU
+                )
                 self.match_img = self.show_image
-                self.show_image = QImage(self.show_image, w, h, QImage.Format.Format_Indexed8)
+                self.show_image = QImage(
+                    self.show_image, w, h, QImage.Format.Format_Indexed8
+                )
                 self.horizontalSliderThreshold.setValue(int(self.threshold))
             else:
                 # self.debug("Slider value has selected")
                 self.threshold = self.horizontalSliderThreshold.value()
-                self.threshold, self.show_image = cv2.threshold(self.show_image, self.threshold, 255, cv2.THRESH_BINARY)
+                self.threshold, self.show_image = cv2.threshold(
+                    self.show_image, self.threshold, 255, cv2.THRESH_BINARY
+                )
                 self.match_img = self.show_image
-                self.show_image = QImage(self.show_image, w, h, QImage.Format.Format_Indexed8)
+                self.show_image = QImage(
+                    self.show_image, w, h, QImage.Format.Format_Indexed8
+                )
 
         # create scene
         self.scene = QtWidgets.QGraphicsScene()
         self.pixmap = QtGui.QPixmap.fromImage(self.show_image)
-        self.pixmap = self.pixmap.scaled(640, 360, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        self.pixmap = self.pixmap.scaled(
+            640, 360, Qt.KeepAspectRatio, Qt.SmoothTransformation
+        )
         self.start = self.graphicsView.start
         self.end = self.graphicsView.end
         # self.debug(f"lefttop = {self.start.x()},{self.start.y()}, bottomright = {self.end.x()},{self.end.y()}")
         self.scene.addPixmap(self.pixmap)
         try:
-            self.rect_ = (QRectF(self.start, self.end))
+            self.rect_ = QRectF(self.start, self.end)
             ret = self.scene.addRect(self.rect_, self.pen)
             self.graphicsView.rect = ret
         except Exception:
@@ -174,7 +203,8 @@ class TemplateMatchSupport(QWidget, Ui_Form):
                     f"threshold={float(self.doubleSpinBox.value())}, "
                     f"color_mode={self.color_mode}, "
                     f"trim={[self.left_top_x, self.left_top_y, self.right_bottom_x, self.right_bottom_y]}"
-                    f")")
+                    f")"
+                )
             else:
                 self.plainTextEdit_2.appendPlainText(
                     f"self.is_contain_template("
@@ -183,14 +213,16 @@ class TemplateMatchSupport(QWidget, Ui_Form):
                     f"color_mode={self.color_mode}, "
                     f"binary_threshold={self.horizontalSliderThreshold.value()}, "
                     f"trim={[self.left_top_x, self.left_top_y, self.right_bottom_x, self.right_bottom_y]}"
-                    f")")
+                    f")"
+                )
 
         except ValueError:
             self.error("画像が読み込まれていない可能性があります")
 
     def set_img_from_file(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, 'Open file', str(pathlib.Path.cwd()),
-                                                   "Image files (*.png)")
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Open file", str(pathlib.Path.cwd()), "Image files (*.png)"
+        )
         if file_path != "":
             self.set_mat_image(file_path)
         else:
@@ -201,8 +233,9 @@ class TemplateMatchSupport(QWidget, Ui_Form):
         self.create_scene(get_img=False)
 
     def load_template_image(self):
-        _img, _ = QFileDialog.getOpenFileName(self, 'Open file', str(pathlib.Path.cwd()),
-                                              "Image files (*.png)")
+        _img, _ = QFileDialog.getOpenFileName(
+            self, "Open file", str(pathlib.Path.cwd()), "Image files (*.png)"
+        )
         if _img != "":
             self.set_template_image(_img)
             self.create_scene(get_img=False)
@@ -216,9 +249,9 @@ class TemplateMatchSupport(QWidget, Ui_Form):
         self.template_img = img
 
     def save_select_area(self):
-        file_path, _ = QFileDialog.getSaveFileName(self, "Save file",
-                                                   str(pathlib.Path.cwd()),
-                                                   "Image files (*.png)")
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Save file", str(pathlib.Path.cwd()), "Image files (*.png)"
+        )
         self.debug(file_path)
         if file_path != "" and self.start != QPoint() and self.end != QPoint():
             ret = self.save_cv_image(file_path)
@@ -226,8 +259,13 @@ class TemplateMatchSupport(QWidget, Ui_Form):
         else:
             self.debug("画像の保存に失敗しました")
 
-        ret = QMessageBox.question(self, "Confirm", "保存した画像をテンプレートとして利用しますか？",
-                                   QMessageBox.Ok, QMessageBox.Cancel)
+        ret = QMessageBox.question(
+            self,
+            "Confirm",
+            "保存した画像をテンプレートとして利用しますか？",
+            QMessageBox.Ok,
+            QMessageBox.Cancel,
+        )
         if ret:
             self.set_template_image(file_path)
             self.create_scene(get_img=False)
@@ -246,7 +284,10 @@ class TemplateMatchSupport(QWidget, Ui_Form):
             self.right_bottom_x = int(max(self.start.x(), self.end.x()) * 2)
             self.left_top_y = int(min(self.start.y(), self.end.y()) * 2)
             self.right_bottom_y = int(max(self.start.y(), self.end.y()) * 2)
-            src = src[self.left_top_y:self.right_bottom_y, self.left_top_x:self.right_bottom_x]
+            src = src[
+                self.left_top_y : self.right_bottom_y,
+                self.left_top_x : self.right_bottom_x,
+            ]
             src_w = self.right_bottom_x - self.left_top_x
             src_h = self.right_bottom_y - self.left_top_y
         if self.template_img == "":
@@ -264,7 +305,9 @@ class TemplateMatchSupport(QWidget, Ui_Form):
                 # self.debug("Auto has selected")
                 _, _template = cv2.threshold(_template, 0, 255, cv2.THRESH_OTSU)
             else:
-                _, _template = cv2.threshold(_template, self.threshold, 255, cv2.THRESH_BINARY)
+                _, _template = cv2.threshold(
+                    _template, self.threshold, 255, cv2.THRESH_BINARY
+                )
         else:
             _template = template
 
@@ -282,8 +325,14 @@ class TemplateMatchSupport(QWidget, Ui_Form):
         scores = res[positions]
         boxes = []
         for y, x in zip(*positions):
-            boxes.append([self.left_top_x + x, self.left_top_y + y,
-                          self.left_top_x + x + w - 1, self.left_top_y + y + h - 1])
+            boxes.append(
+                [
+                    self.left_top_x + x,
+                    self.left_top_y + y,
+                    self.left_top_x + x + w - 1,
+                    self.left_top_y + y + h - 1,
+                ]
+            )
         boxes = np.array(boxes)
         boxes = self.non_max_suppression(boxes, scores, overlap_thresh=0.8)
 
@@ -299,7 +348,9 @@ class TemplateMatchSupport(QWidget, Ui_Form):
         self.lineEditMatchNum.setText(str(box_n))
 
     @staticmethod
-    def non_max_suppression(boxes: np.ndarray, scores: np.ndarray, overlap_thresh: float) -> np.ndarray:
+    def non_max_suppression(
+        boxes: np.ndarray, scores: np.ndarray, overlap_thresh: float
+    ) -> np.ndarray:
         """
         https://pystyle.info/opencv-non-maximum-suppression/ を参考にしました。
         Non Maximum Suppression (NMS) を行う。
@@ -361,7 +412,10 @@ class TemplateMatchSupport(QWidget, Ui_Form):
 
     def save_cv_image(self, filename: pathlib.Path, params: Optional = None) -> bool:
         try:
-            img = self.image[self.left_top_y:self.right_bottom_y, self.left_top_x:self.right_bottom_x]
+            img = self.image[
+                self.left_top_y : self.right_bottom_y,
+                self.left_top_x : self.right_bottom_x,
+            ]
             result, n = cv2.imencode(".png", img, params)
 
             if result:
@@ -456,10 +510,12 @@ class WidgetIMG(QWidget):
             self.processing = True
             self.end = self.mapToGlobal(event.pos())
             self.movement = self.end - self.start
-            self.setGeometry(self.mapToGlobal(self.movement).x(),
-                             self.mapToGlobal(self.movement).y(),
-                             self.width(),
-                             self.height())
+            self.setGeometry(
+                self.mapToGlobal(self.movement).x(),
+                self.mapToGlobal(self.movement).y(),
+                self.width(),
+                self.height(),
+            )
             self.start = self.end
             self.processing = False
 

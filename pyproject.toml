@@ -1,0 +1,21 @@
+[project]
+name = "swcon-pyside"
+version = "0.8.0"
+description = "NSX-Controller"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "cv2-enumerate-cameras>=1.3.3",
+    "mypy>=1.20.0",
+    "mypy-extensions>=1.1.0",
+    "numpy>=2.2.6",
+    "opencv-python>=4.13.0.92",
+    "pillow>=12.2.0",
+    "pygame>=2.6.1",
+    "pykakasi>=2.3.0",
+    "pyserial>=3.5",
+    "pyside6>=6.11.0",
+    "requests>=2.33.1",
+    "scipy>=1.15.3",
+    "toml>=0.10.2",
+]

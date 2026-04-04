@@ -1,67 +1,65 @@
+from __future__ import annotations
+
 import logging
 import os
 import sys
-import threading
-import time
-import collections
-from multiprocessing import Array, Process, shared_memory
-from os import environ
+from logging import DEBUG, NullHandler, getLogger
+from typing import Optional
 
-import numpy as np
-
-environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
-from logging import DEBUG, NullHandler, StreamHandler, getLogger
+os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
 import pygame
 import pygame.locals
-import PySide6
-from PySide6 import QtCore, QtGui, QtSerialPort, QtWidgets
-from PySide6.QtCore import QObject
-from PySide6.QtWidgets import QPushButton
+from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6.QtCore import QObject, QTimer, Signal, Slot
 
 try:
     from libs.settings import Setting
-except:
-    sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+except Exception:
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
     from libs.settings import Setting
+
 from ui.key_config import Ui_Form
 
 
 class SettingWindow(QtWidgets.QWidget, Ui_Form):
-    def __init__(self, parent=None, _setting=None):
-        super(SettingWindow, self).__init__()
-        self.is_alive = False
+    def __init__(self, parent=None, _setting=None) -> None:
+        super().__init__(parent)
         self.setupUi(self)
         self.setting = _setting
         self.setting.load()
-        print(self.setting.setting)
         self.controller_setting = self.setting.setting["key_config"]["joystick"]
+
         self.set_config()
         self.set_state()
         self.connect_function()
 
         pygame.init()
         pygame.joystick.init()
-        self.joystick = pygame.joystick.Joystick(0)
-        self.joystick.init()
-        self.setWindowTitle(self.joystick.get_name())
-        self.hat_prev = 0
+        self.joystick = None
+        if pygame.joystick.get_count() > 0:
+            self.joystick = pygame.joystick.Joystick(0)
+            self.joystick.init()
+            self.setWindowTitle(self.joystick.get_name())
+
         self.keymap = {
-                          v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["button"].items() if
-                          v["state"]
-                      } | {v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["hat"].items() if
-                           v["state"]}
-        # print(self.keymap)
+            v["assign"]: k
+            for k, v in self.setting.setting["key_config"]["joystick"]["button"].items()
+            if v["state"]
+        } | {
+            v["assign"]: k
+            for k, v in self.setting.setting["key_config"]["joystick"]["hat"].items()
+            if v["state"]
+        }
 
         self.Controller_worker = GamepadController()
-        self.Controller_thread = QtCore.QThread()
+        self.Controller_thread = QtCore.QThread(self)
         self.Controller_worker.moveToThread(self.Controller_thread)
         self.Controller_thread.started.connect(self.Controller_worker.run)
         self.Controller_worker.set_keymap(self.keymap)
         self.Controller_thread.start()
 
-    def connect_function(self):
-        self.lineEdit.textChanged.connect(self.btn_ZL)
+    def connect_function(self) -> None:
         self.lineEdit.textChanged.connect(self.btn_ZL)
         self.lineEdit_2.textChanged.connect(self.btn_L)
         self.lineEdit_3.textChanged.connect(self.btn_LCLICK)
@@ -99,7 +97,6 @@ class SettingWindow(QtWidgets.QWidget, Ui_Form):
         self.checkBox_16.stateChanged.connect(self.btn_X)
         self.checkBox_17.stateChanged.connect(self.btn_Y)
         self.checkBox_18.stateChanged.connect(self.btn_HOME)
-
         self.checkBox_21.stateChanged.connect(self.dir_L)
         self.checkBox_22.stateChanged.connect(self.dir_R)
 
@@ -121,10 +118,9 @@ class SettingWindow(QtWidgets.QWidget, Ui_Form):
         self.pushButton_16.clicked.connect(self.set_btn_X)
         self.pushButton_17.clicked.connect(self.set_btn_Y)
         self.pushButton_18.clicked.connect(self.set_btn_HOME)
-
         self.pushButton_19.clicked.connect(self.remap_key)
 
-    def set_config(self):
+    def set_config(self) -> None:
         self.lineEdit.setText(self.controller_setting["button"]["ZL"]["assign"])
         self.lineEdit_2.setText(self.controller_setting["button"]["L"]["assign"])
         self.lineEdit_3.setText(self.controller_setting["button"]["LCLICK"]["assign"])
@@ -144,7 +140,7 @@ class SettingWindow(QtWidgets.QWidget, Ui_Form):
         self.lineEdit_17.setText(self.controller_setting["button"]["Y"]["assign"])
         self.lineEdit_18.setText(self.controller_setting["button"]["HOME"]["assign"])
 
-    def set_state(self):
+    def set_state(self) -> None:
         if self.controller_setting["button"]["ZL"]["state"]:
             self.checkBox.toggle()
         if self.controller_setting["button"]["L"]["state"]:
@@ -181,714 +177,509 @@ class SettingWindow(QtWidgets.QWidget, Ui_Form):
             self.checkBox_17.toggle()
         if self.controller_setting["button"]["HOME"]["state"]:
             self.checkBox_18.toggle()
-
         if self.controller_setting["direction"]["LStick"]:
             self.checkBox_21.toggle()
         if self.controller_setting["direction"]["RStick"]:
             self.checkBox_22.toggle()
 
-    def remap_key(self):
+    def remap_key(self) -> None:
         self.keymap = {
-                          v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["button"].items() if
-                          v["state"]
-                      } | {v["assign"]: k for k, v in self.setting.setting["key_config"]["joystick"]["hat"].items() if
-                           v["state"]}
-        try:
-            self.Controller_worker.set_keymap(self.keymap)
-        except Exception as e:
-            pass
-        print(self.keymap)
+            v["assign"]: k
+            for k, v in self.setting.setting["key_config"]["joystick"]["button"].items()
+            if v["state"]
+        } | {
+            v["assign"]: k
+            for k, v in self.setting.setting["key_config"]["joystick"]["hat"].items()
+            if v["state"]
+        }
+        self.Controller_worker.set_keymap(self.keymap)
 
-    def btn_ZL(self):
+    def btn_ZL(self) -> None:
         self.setting.setting["key_config"]["joystick"]["button"]["ZL"] = {
             "state": self.checkBox.isChecked(),
             "assign": self.lineEdit.text(),
         }
 
-    def btn_L(self):
+    def btn_L(self) -> None:
         self.setting.setting["key_config"]["joystick"]["button"]["L"] = {
             "state": self.checkBox_2.isChecked(),
             "assign": self.lineEdit_2.text(),
         }
 
-    def btn_LCLICK(self):
+    def btn_LCLICK(self) -> None:
         self.setting.setting["key_config"]["joystick"]["button"]["LCLICK"] = {
             "state": self.checkBox_3.isChecked(),
             "assign": self.lineEdit_3.text(),
         }
 
-    def btn_MINUS(self):
+    def btn_MINUS(self) -> None:
         self.setting.setting["key_config"]["joystick"]["button"]["MINUS"] = {
             "state": self.checkBox_4.isChecked(),
             "assign": self.lineEdit_4.text(),
         }
 
-    def hat_TOP(self):
+    def hat_TOP(self) -> None:
         self.setting.setting["key_config"]["joystick"]["hat"]["TOP"] = {
             "state": self.checkBox_5.isChecked(),
             "assign": self.lineEdit_5.text(),
         }
 
-    def hat_BTM(self):
+    def hat_BTM(self) -> None:
         self.setting.setting["key_config"]["joystick"]["hat"]["BTM"] = {
             "state": self.checkBox_6.isChecked(),
             "assign": self.lineEdit_6.text(),
         }
 
-    def hat_LEFT(self):
+    def hat_LEFT(self) -> None:
         self.setting.setting["key_config"]["joystick"]["hat"]["LEFT"] = {
             "state": self.checkBox_7.isChecked(),
             "assign": self.lineEdit_7.text(),
         }
 
-    def hat_RIGHT(self):
+    def hat_RIGHT(self) -> None:
         self.setting.setting["key_config"]["joystick"]["hat"]["RIGHT"] = {
             "state": self.checkBox_8.isChecked(),
             "assign": self.lineEdit_8.text(),
         }
 
-    def btn_CAPTURE(self):
+    def btn_CAPTURE(self) -> None:
         self.setting.setting["key_config"]["joystick"]["button"]["CAPTURE"] = {
             "state": self.checkBox_9.isChecked(),
             "assign": self.lineEdit_9.text(),
         }
 
-    def btn_ZR(self):
+    def btn_ZR(self) -> None:
         self.setting.setting["key_config"]["joystick"]["button"]["ZR"] = {
             "state": self.checkBox_10.isChecked(),
             "assign": self.lineEdit_10.text(),
         }
 
-    def btn_R(self):
+    def btn_R(self) -> None:
         self.setting.setting["key_config"]["joystick"]["button"]["R"] = {
             "state": self.checkBox_11.isChecked(),
             "assign": self.lineEdit_11.text(),
         }
 
-    def btn_RCLICK(self):
+    def btn_RCLICK(self) -> None:
         self.setting.setting["key_config"]["joystick"]["button"]["RCLICK"] = {
             "state": self.checkBox_12.isChecked(),
             "assign": self.lineEdit_12.text(),
         }
 
-    def btn_PLUS(self):
+    def btn_PLUS(self) -> None:
         self.setting.setting["key_config"]["joystick"]["button"]["PLUS"] = {
             "state": self.checkBox_13.isChecked(),
             "assign": self.lineEdit_13.text(),
         }
 
-    def btn_A(self):
+    def btn_A(self) -> None:
         self.setting.setting["key_config"]["joystick"]["button"]["A"] = {
             "state": self.checkBox_14.isChecked(),
             "assign": self.lineEdit_14.text(),
         }
 
-    def btn_B(self):
+    def btn_B(self) -> None:
         self.setting.setting["key_config"]["joystick"]["button"]["B"] = {
             "state": self.checkBox_15.isChecked(),
             "assign": self.lineEdit_15.text(),
         }
 
-    def btn_X(self):
+    def btn_X(self) -> None:
         self.setting.setting["key_config"]["joystick"]["button"]["X"] = {
             "state": self.checkBox_16.isChecked(),
             "assign": self.lineEdit_16.text(),
         }
 
-    def btn_Y(self):
+    def btn_Y(self) -> None:
         self.setting.setting["key_config"]["joystick"]["button"]["Y"] = {
             "state": self.checkBox_17.isChecked(),
             "assign": self.lineEdit_17.text(),
         }
 
-    def btn_HOME(self):
+    def btn_HOME(self) -> None:
         self.setting.setting["key_config"]["joystick"]["button"]["HOME"] = {
             "state": self.checkBox_18.isChecked(),
             "assign": self.lineEdit_18.text(),
         }
 
-    def dir_L(self):
-        self.setting.setting["key_config"]["joystick"]["direction"]["LStick"] = self.checkBox_21.isChecked()
+    def dir_L(self) -> None:
+        self.setting.setting["key_config"]["joystick"]["direction"]["LStick"] = (
+            self.checkBox_21.isChecked()
+        )
 
-    def dir_R(self):
-        self.setting.setting["key_config"]["joystick"]["direction"]["RStick"] = self.checkBox_22.isChecked()
+    def dir_R(self) -> None:
+        self.setting.setting["key_config"]["joystick"]["direction"]["RStick"] = (
+            self.checkBox_22.isChecked()
+        )
 
-    def set_btn_ZL(self):
+    def _set_line_edit_from_key(self, widget) -> None:
         ret = self.set_key()
-        self.lineEdit.setText(str(ret))
+        widget.setText(str(ret))
 
-    def set_btn_L(self):
-        ret = self.set_key()
-        self.lineEdit_2.setText(str(ret))
+    def set_btn_ZL(self) -> None:
+        self._set_line_edit_from_key(self.lineEdit)
 
-    def set_btn_LCLICK(self):
-        ret = self.set_key()
-        self.lineEdit_3.setText(str(ret))
+    def set_btn_L(self) -> None:
+        self._set_line_edit_from_key(self.lineEdit_2)
 
-    def set_btn_MINUS(self):
-        ret = self.set_key()
-        self.lineEdit_4.setText(str(ret))
+    def set_btn_LCLICK(self) -> None:
+        self._set_line_edit_from_key(self.lineEdit_3)
 
-    def set_hat_TOP(self):
-        ret = self.set_key()
-        self.lineEdit_5.setText(str(ret))
+    def set_btn_MINUS(self) -> None:
+        self._set_line_edit_from_key(self.lineEdit_4)
 
-    def set_hat_BTM(self):
-        ret = self.set_key()
-        self.lineEdit_6.setText(str(ret))
+    def set_hat_TOP(self) -> None:
+        self._set_line_edit_from_key(self.lineEdit_5)
 
-    def set_hat_LEFT(self):
-        ret = self.set_key()
-        self.lineEdit_7.setText(str(ret))
+    def set_hat_BTM(self) -> None:
+        self._set_line_edit_from_key(self.lineEdit_6)
 
-    def set_hat_RIGHT(self):
-        ret = self.set_key()
-        self.lineEdit_8.setText(str(ret))
+    def set_hat_LEFT(self) -> None:
+        self._set_line_edit_from_key(self.lineEdit_7)
 
-    def set_btn_CAPTURE(self):
-        ret = self.set_key()
-        self.lineEdit_9.setText(str(ret))
+    def set_hat_RIGHT(self) -> None:
+        self._set_line_edit_from_key(self.lineEdit_8)
 
-    def set_btn_ZR(self):
-        ret = self.set_key()
-        self.lineEdit_10.setText(str(ret))
+    def set_btn_CAPTURE(self) -> None:
+        self._set_line_edit_from_key(self.lineEdit_9)
 
-    def set_btn_R(self):
-        ret = self.set_key()
-        self.lineEdit_11.setText(str(ret))
+    def set_btn_ZR(self) -> None:
+        self._set_line_edit_from_key(self.lineEdit_10)
 
-    def set_btn_RCLICK(self):
-        ret = self.set_key()
-        self.lineEdit_12.setText(str(ret))
+    def set_btn_R(self) -> None:
+        self._set_line_edit_from_key(self.lineEdit_11)
 
-    def set_btn_PLUS(self):
-        ret = self.set_key()
-        self.lineEdit_13.setText(str(ret))
+    def set_btn_RCLICK(self) -> None:
+        self._set_line_edit_from_key(self.lineEdit_12)
 
-    def set_btn_A(self):
-        ret = self.set_key()
-        self.lineEdit_14.setText(str(ret))
+    def set_btn_PLUS(self) -> None:
+        self._set_line_edit_from_key(self.lineEdit_13)
 
-    def set_btn_B(self):
-        ret = self.set_key()
-        self.lineEdit_15.setText(str(ret))
+    def set_btn_A(self) -> None:
+        self._set_line_edit_from_key(self.lineEdit_14)
 
-    def set_btn_X(self):
-        ret = self.set_key()
-        self.lineEdit_16.setText(str(ret))
+    def set_btn_B(self) -> None:
+        self._set_line_edit_from_key(self.lineEdit_15)
 
-    def set_btn_Y(self):
-        ret = self.set_key()
-        self.lineEdit_17.setText(str(ret))
+    def set_btn_X(self) -> None:
+        self._set_line_edit_from_key(self.lineEdit_16)
 
-    def set_btn_HOME(self):
-        ret = self.set_key()
-        self.lineEdit_18.setText(str(ret))
+    def set_btn_Y(self) -> None:
+        self._set_line_edit_from_key(self.lineEdit_17)
+
+    def set_btn_HOME(self) -> None:
+        self._set_line_edit_from_key(self.lineEdit_18)
 
     @staticmethod
     def set_key():
         ret = None
         while True:
             for e in pygame.event.get():
-
                 if e.type == pygame.locals.JOYAXISMOTION:
-                    # print(e)
-                    # print(self.joystick.get_axis(0))  # left horizontal
-                    # print(self.joystick.get_axis(1))  # left vertical
-                    # print(self.joystick.get_axis(2))  # right horizontal
-                    # print(self.joystick.get_axis(3))  # right vertical
-                    # print(self.joystick.get_axis(4))  # left trigger
-                    # print(self.joystick.get_axis(5))  # right trigger
-                    if e.axis == 4 or e.axis == 5:
+                    if e.axis in (4, 5):
                         ret = f"axis.{e.axis}"
-                        print(e)
-                    pass
-
                 elif e.type == pygame.locals.JOYHATMOTION:
                     ret = e
-                    print(e)
-                    pass
-
                 elif e.type == pygame.locals.JOYBUTTONDOWN:
                     ret = f"button.{e.button}"
-                    print(e, e.button)
-                    pass
 
-                elif e.type == pygame.locals.JOYBUTTONUP:
-                    pass
-            if ret is not None:
-                break
-        return ret
+                if ret is not None:
+                    return ret
 
     def closeEvent(self, a0: QtGui.QCloseEvent) -> None:
         self.setting.save()
-        self.Controller_worker.stop()
-        self.Controller_worker.is_alive = False
-        # self.Controller_thread.quit()
+        if self.Controller_worker is not None:
+            self.Controller_worker.stop()
+        if self.Controller_thread is not None:
+            self.Controller_thread.quit()
+            self.Controller_thread.wait(2000)
         return super().closeEvent(a0)
 
 
 class GamepadController(QObject):
-    ZL_PRESSED = QtCore.Signal()
-    L_PRESSED = QtCore.Signal()
-    LCLICK_PRESSED = QtCore.Signal()
-    MINUS_PRESSED = QtCore.Signal()
-    TOP_PRESSED = QtCore.Signal()
-    BTM_PRESSED = QtCore.Signal()
-    LEFT_PRESSED = QtCore.Signal()
-    RIGHT_PRESSED = QtCore.Signal()
-    CAPTURE_PRESSED = QtCore.Signal()
-    ZR_PRESSED = QtCore.Signal()
-    R_PRESSED = QtCore.Signal()
-    RCLICK_PRESSED = QtCore.Signal()
-    PLUS_PRESSED = QtCore.Signal()
-    A_PRESSED = QtCore.Signal()
-    B_PRESSED = QtCore.Signal()
-    X_PRESSED = QtCore.Signal()
-    Y_PRESSED = QtCore.Signal()
-    HOME_PRESSED = QtCore.Signal()
+    ZL_PRESSED = Signal()
+    L_PRESSED = Signal()
+    LCLICK_PRESSED = Signal()
+    MINUS_PRESSED = Signal()
+    TOP_PRESSED = Signal()
+    BTM_PRESSED = Signal()
+    LEFT_PRESSED = Signal()
+    RIGHT_PRESSED = Signal()
+    CAPTURE_PRESSED = Signal()
+    ZR_PRESSED = Signal()
+    R_PRESSED = Signal()
+    RCLICK_PRESSED = Signal()
+    PLUS_PRESSED = Signal()
+    A_PRESSED = Signal()
+    B_PRESSED = Signal()
+    X_PRESSED = Signal()
+    Y_PRESSED = Signal()
+    HOME_PRESSED = Signal()
 
-    ZL_RELEASED = QtCore.Signal()
-    L_RELEASED = QtCore.Signal()
-    LCLICK_RELEASED = QtCore.Signal()
-    MINUS_RELEASED = QtCore.Signal()
-    TOP_RELEASED = QtCore.Signal()
-    BTM_RELEASED = QtCore.Signal()
-    LEFT_RELEASED = QtCore.Signal()
-    RIGHT_RELEASED = QtCore.Signal()
-    CAPTURE_RELEASED = QtCore.Signal()
-    ZR_RELEASED = QtCore.Signal()
-    R_RELEASED = QtCore.Signal()
-    RCLICK_RELEASED = QtCore.Signal()
-    PLUS_RELEASED = QtCore.Signal()
-    A_RELEASED = QtCore.Signal()
-    B_RELEASED = QtCore.Signal()
-    X_RELEASED = QtCore.Signal()
-    Y_RELEASED = QtCore.Signal()
-    HOME_RELEASED = QtCore.Signal()
+    ZL_RELEASED = Signal()
+    L_RELEASED = Signal()
+    LCLICK_RELEASED = Signal()
+    MINUS_RELEASED = Signal()
+    TOP_RELEASED = Signal()
+    BTM_RELEASED = Signal()
+    LEFT_RELEASED = Signal()
+    RIGHT_RELEASED = Signal()
+    CAPTURE_RELEASED = Signal()
+    ZR_RELEASED = Signal()
+    R_RELEASED = Signal()
+    RCLICK_RELEASED = Signal()
+    PLUS_RELEASED = Signal()
+    A_RELEASED = Signal()
+    B_RELEASED = Signal()
+    X_RELEASED = Signal()
+    Y_RELEASED = Signal()
+    HOME_RELEASED = Signal()
 
-    AXIS_MOVED = QtCore.Signal(float, float, float, float)
+    AXIS_MOVED = Signal(float, float, float, float)
 
-    print_strings = QtCore.Signal(str, type(logging.DEBUG))
+    button_pressed = Signal(str)
+    button_released = Signal(str)
+    axis_moved = Signal(float, float, float, float)
+    print_strings = Signal(str, int)
+    log = Signal(str, int)
 
-    def __init__(self):
-        super(GamepadController, self).__init__()
+    def __init__(self) -> None:
+        super().__init__()
 
         self.logger = getLogger(__name__)
         self.logger.addHandler(NullHandler())
-        self.logger.addHandler(StreamHandler())
         self.logger.setLevel(DEBUG)
         self.logger.propagate = True
-        self.joystick_: (None, pygame.joystick.Joystick) = None
-        self.use_Rstick = None
-        self.use_Lstick = None
+
+        self.joystick_: Optional[pygame.joystick.Joystick] = None
+        self.use_Rstick = False
+        self.use_Lstick = False
         self.is_alive = True
-        self.keymap = {}
+        self.keymap: dict[str, str] = {}
         self.pause = False
-        self.p = None
         self.isCanceled = False
-        self.send_err = False
         self.no_joystick = True
+
+        self._prev_button_state: dict[str, bool] = {}
+        self._prev_axis_button_state: dict[str, int] = {}
+        self._prev_hat_state: dict[str, bool] = {}
+        self._timer: Optional[QTimer] = None
+
         pygame.init()
+        pygame.joystick.init()
         self.connect_joystick()
 
-        self._stick = np.zeros((4, 1))
-        self._btn_down = np.array([0])
-        self._btn_up = np.array([0])
+    def _emit_log(self, level: int, s: str, force: bool = False) -> None:
+        if force or not self.isCanceled:
+            msg = f"{s}"
+            self.print_strings.emit(msg, level)
+            self.log.emit(msg, level)
 
-        self.shm = shared_memory.SharedMemory(create=True, size=self._stick.nbytes, name="stick")  # 共有メモリを作成
+    def debug(self, s, force: bool = False) -> None:
+        self._emit_log(logging.DEBUG, str(s), force=force)
 
-        self.stick = np.ndarray(self._stick.shape, dtype=self._stick.dtype, buffer=self.shm.buf)
+    def info(self, s, force: bool = False) -> None:
+        self._emit_log(logging.INFO, str(s), force=force)
 
-    def connect_joystick(self):
+    def warning(self, s, force: bool = False) -> None:
+        self._emit_log(logging.WARNING, str(s), force=force)
+
+    def error(self, s, force: bool = False) -> None:
+        self._emit_log(logging.ERROR, str(s), force=force)
+
+    def critical(self, s, force: bool = False) -> None:
+        self._emit_log(logging.CRITICAL, str(s), force=force)
+
+    @Slot()
+    def connect_joystick(self) -> None:
         self.debug("Connecting Joystick...")
         try:
+            pygame.joystick.quit()
             pygame.joystick.init()
+
+            if pygame.joystick.get_count() <= 0:
+                self.no_joystick = True
+                self.joystick_ = None
+                self.debug("Connection failed: no joystick")
+                return
+
             self.joystick_ = pygame.joystick.Joystick(0)
             self.joystick_.init()
-            self.debug("Successfully connected")
             self.no_joystick = False
-            self.reconnect_subprocess()
-            self.stick[0][0] = 0
-            self.stick[1][0] = 0
-            self.stick[2][0] = 0
-            self.stick[3][0] = 0
-            return True
-        except Exception:
-            # print(Exception)
+
+            # 追加: stateをクリア
+            self._prev_button_state.clear()
+            self._prev_axis_button_state.clear()
+            self._prev_hat_state.clear()
+
+            self.debug("Successfully connected")
+        except Exception as exc:
             self.no_joystick = True
-            self.debug("Connection Failed")
-            return False
+            self.joystick_ = None
+            self.debug(f"Connection failed: {exc}")
 
-    def reconnect_subprocess(self):
-        if self.p is not None:
-            self.p.kill()
-            self.p.join()
-            self.p = None
-        self.p = Process(target=j_stick)
-        self.p.start()
-        self.send_err = False
+    @Slot(dict)
+    def set_keymap(self, keymap: dict[str, str]) -> None:
+        self.keymap = dict(keymap)
 
-    def set_keymap(self, keymap):
-        self.keymap = keymap
+    @Slot(bool)
+    def set_l_stick(self, v: bool) -> None:
+        self.use_Lstick = bool(v)
 
-    def set_l_stick(self, v):
-        self.use_Lstick = v
+    @Slot(bool)
+    def set_r_stick(self, v: bool) -> None:
+        self.use_Rstick = bool(v)
 
-    def set_r_stick(self, v):
-        self.use_Rstick = v
+    @Slot(bool)
+    def set_pause(self, paused: bool) -> None:
+        self.pause = bool(paused)
 
-    def run(self):
-        # print(self.joystick.get_name())
-        # self.joystick_.init()
-        try:
-            self.p.start()
-        except:
-            pass
-        # while self.is_alive:
-        while True:
-            if self.pause is True or self.no_joystick:
-                time.sleep(1.0)
-                if self.no_joystick:
-                    try:
-                        for e in pygame.event.get():
-                            if e.type == pygame.JOYDEVICEADDED:
-                                self.info("コントローラが接続されました。")
-                                while self.no_joystick:
-                                    self.connect_joystick()
-                    except:
-                        pass
-                continue
-            # print(f"running {threading.get_ident()}")
-            start = time.perf_counter()
-            try:
-                if self.p is None or not self.p.is_alive():
-                    time.sleep(max(1 / 10 - (time.perf_counter() - start), 0.0001))
-                    if self.send_err is False:
-                        self.warning("コントローラとの接続が切断されました。")
-                        self.send_err = True
-                        self.no_joystick = True
-                        # print("NNN")
-                        continue
-                if self.use_Lstick and self.use_Rstick:
-                    self.AXIS_MOVED.emit(
-                        self.stick[0][0],  # left horizontal
-                        self.stick[1][0],  # left vertical
-                        self.stick[2][0],  # right horizontal
-                        self.stick[3][0],  # right vertical
-                    )
-                elif self.use_Lstick:
-                    self.AXIS_MOVED.emit(
-                        self.stick[0][0],  # left horizontal
-                        self.stick[1][0],  # left vertical
-                        0,
-                        0,
-                    )
-                elif self.use_Rstick:
-                    self.AXIS_MOVED.emit(
-                        0,
-                        0,
-                        self.stick[2][0],  # right horizontal
-                        self.stick[3][0],  # right vertical
-                    )
-                for e in pygame.event.get():
-                    # print(type(e))
-                    try:
-                        match e.type:
-                            case pygame.locals.JOYAXISMOTION:
-                                if self.keymap.get(f"axis.{e.axis}") is not None:  # ここはキー入力なので値を1, -1に丸めてもよい
-                                    # print("axis, ", self.keymap.get(f"axis.{e.axis}"), self.joystick.get_axis(e.axis))
-                                    val = int(round(self.joystick_.get_axis(e.axis), 0))
-                                    match self.keymap.get(f"axis.{e.axis}"):
-                                        case "ZL":
-                                            if val == 1:
-                                                self.ZL_PRESSED.emit()
-                                            elif val == -1:
-                                                self.ZL_RELEASED.emit()
-                                        case "L":
-                                            if val == 1:
-                                                self.L_PRESSED.emit()
-                                            elif val == -1:
-                                                self.L_RELEASED.emit()
-                                        case "LCLICK":
-                                            if val == 1:
-                                                self.LCLICK_PRESSED.emit()
-                                            elif val == -1:
-                                                self.LCLICK_RELEASED.emit()
-                                        case "MINUS":
-                                            if val == 1:
-                                                self.MINUS_PRESSED.emit()
-                                            elif val == -1:
-                                                self.MINUS_RELEASED.emit()
-                                        case "TOP":
-                                            if val == 1:
-                                                self.TOP_PRESSED.emit()
-                                            elif val == -1:
-                                                self.TOP_RELEASED.emit()
-                                        case "BTM":
-                                            if val == 1:
-                                                self.BTM_PRESSED.emit()
-                                            elif val == -1:
-                                                self.BTM_RELEASED.emit()
-                                        case "LEFT":
-                                            if val == 1:
-                                                self.LEFT_PRESSED.emit()
-                                            elif val == -1:
-                                                self.LEFT_RELEASED.emit()
-                                        case "RIGHT":
-                                            if val == 1:
-                                                self.RIGHT_PRESSED.emit()
-                                            elif val == -1:
-                                                self.RIGHT_RELEASED.emit()
-                                        case "CAPTURE":
-                                            if val == 1:
-                                                self.CAPTURE_PRESSED.emit()
-                                            elif val == -1:
-                                                self.CAPTURE_RELEASED.emit()
-                                        case "ZR":
-                                            if val == 1:
-                                                self.ZR_PRESSED.emit()
-                                            elif val == -1:
-                                                self.ZR_RELEASED.emit()
-                                        case "R":
-                                            if val == 1:
-                                                self.R_PRESSED.emit()
-                                            elif val == -1:
-                                                self.R_RELEASED.emit()
-                                        case "RCLICK":
-                                            if val == 1:
-                                                self.RCLICK_PRESSED.emit()
-                                            elif val == -1:
-                                                self.RCLICK_RELEASED.emit()
-                                        case "PLUS":
-                                            if val == 1:
-                                                self.PLUS_PRESSED.emit()
-                                            elif val == -1:
-                                                self.PLUS_RELEASED.emit()
-                                        case "A":
-                                            if val == 1:
-                                                self.A_PRESSED.emit()
-                                            elif val == -1:
-                                                self.A_RELEASED.emit()
-                                        case "B":
-                                            if val == 1:
-                                                self.B_PRESSED.emit()
-                                            elif val == -1:
-                                                self.B_RELEASED.emit()
-                                        case "X":
-                                            if val == 1:
-                                                self.X_PRESSED.emit()
-                                            elif val == -1:
-                                                self.X_RELEASED.emit()
-                                        case "Y":
-                                            if val == 1:
-                                                self.Y_PRESSED.emit()
-                                            elif val == -1:
-                                                self.Y_RELEASED.emit()
-                                        case "HOME":
-                                            if val == 1:
-                                                self.HOME_PRESSED.emit()
-                                            elif val == -1:
-                                                self.HOME_RELEASED.emit()
+    @Slot()
+    def run(self) -> None:
+        if self._timer is None:
+            self._timer = QTimer(self)
+            self._timer.setTimerType(QtCore.Qt.TimerType.PreciseTimer)
+            self._timer.timeout.connect(self._poll_once)
+            self._timer.setInterval(16)
+        self._timer.start()
 
-                            case pygame.locals.JOYBUTTONDOWN:
-
-                                # print(self.btn_down)
-                                if self.keymap.get(f"button.{e.button}") is not None:
-                                    # print("button-down, ", self.keymap.get(f"button.{e.button}"))
-                                    match self.keymap.get(f"button.{e.button}"):
-                                        case "ZL":
-                                            self.ZL_PRESSED.emit()
-                                        case "L":
-                                            self.L_PRESSED.emit()
-                                        case "LCLICK":
-                                            self.LCLICK_PRESSED.emit()
-                                        case "MINUS":
-                                            self.MINUS_PRESSED.emit()
-                                        case "TOP":
-                                            self.TOP_PRESSED.emit()
-                                        case "BTM":
-                                            self.BTM_PRESSED.emit()
-                                        case "LEFT":
-                                            self.LEFT_PRESSED.emit()
-                                        case "RIGHT":
-                                            self.RIGHT_PRESSED.emit()
-                                        case "CAPTURE":
-                                            self.CAPTURE_PRESSED.emit()
-                                        case "ZR":
-                                            self.ZR_PRESSED.emit()
-                                        case "R":
-                                            self.R_PRESSED.emit()
-                                        case "RCLICK":
-                                            self.RCLICK_PRESSED.emit()
-                                        case "PLUS":
-                                            self.PLUS_PRESSED.emit()
-                                        case "A":
-                                            self.A_PRESSED.emit()
-                                        case "B":
-                                            self.B_PRESSED.emit()
-                                        case "X":
-                                            self.X_PRESSED.emit()
-                                        case "Y":
-                                            self.Y_PRESSED.emit()
-                                        case "HOME":
-                                            self.HOME_PRESSED.emit()
-                            case pygame.locals.JOYBUTTONUP:
-                                if self.keymap.get(f"button.{e.button}") is not None:
-                                    # print("button-up, ", self.keymap.get(f"button.{e.button}"))
-                                    match self.keymap.get(f"button.{e.button}"):
-                                        case "ZL":
-                                            self.ZL_RELEASED.emit()
-                                        case "L":
-                                            self.L_RELEASED.emit()
-                                        case "LCLICK":
-                                            self.LCLICK_RELEASED.emit()
-                                        case "MINUS":
-                                            self.MINUS_RELEASED.emit()
-                                        case "TOP":
-                                            self.TOP_RELEASED.emit()
-                                        case "BTM":
-                                            self.BTM_RELEASED.emit()
-                                        case "LEFT":
-                                            self.LEFT_RELEASED.emit()
-                                        case "RIGHT":
-                                            self.RIGHT_RELEASED.emit()
-                                        case "CAPTURE":
-                                            self.CAPTURE_RELEASED.emit()
-                                        case "ZR":
-                                            self.ZR_RELEASED.emit()
-                                        case "R":
-                                            self.R_RELEASED.emit()
-                                        case "RCLICK":
-                                            self.RCLICK_RELEASED.emit()
-                                        case "PLUS":
-                                            self.PLUS_RELEASED.emit()
-                                        case "A":
-                                            self.A_RELEASED.emit()
-                                        case "B":
-                                            self.B_RELEASED.emit()
-                                        case "X":
-                                            self.X_RELEASED.emit()
-                                        case "Y":
-                                            self.Y_RELEASED.emit()
-                                        case "HOME":
-                                            self.HOME_RELEASED.emit()
-                    except:
-                        pass
-            except RuntimeError:
-                pass
-            except ValueError:
-                pass
-            except Exception:
-                print(Exception)
-
-            time.sleep(max(1 / 60 - (time.perf_counter() - start), 0.0001))
-
-        try:
-            self.p.close()
-            self.p.kill()
-        except ValueError:
-            pass
-        except Exception:
-            print(Exception)
-
-    def check(self):
-        print(self.is_alive)
-
-    def stop(self):
+    @Slot()
+    def stop(self) -> None:
         self.is_alive = False
-        self.p.terminate()
-        self.p.close()
-        print("close")
-        self.p.kill()
+        self.pause = True
+        self.isCanceled = True
+        if self._timer is not None:
+            self._timer.stop()
 
-        print("kill")
+    def _emit_legacy(self, name: str, pressed: bool) -> None:
+        attr = f"{name}_{'PRESSED' if pressed else 'RELEASED'}"
+        signal = getattr(self, attr, None)
+        if signal is not None:
+            signal.emit()
+        if pressed:
+            self.button_pressed.emit(name)
+        else:
+            self.button_released.emit(name)
 
-    # ログをメインに飛ばすため
-    def debug(self, s, force=False):
-        if force or not self.isCanceled:
-            s = f"thread id={threading.get_ident()} " + str(s)
-            self.print_strings.emit(s, logging.DEBUG)
+    def _handle_axis_as_button(self, axis_index: int, axis_value: float) -> None:
+        mapped_name = self.keymap.get(f"axis.{axis_index}")
+        if mapped_name is None:
+            return
 
-    def info(self, s, force=False):
-        if force or not self.isCanceled:
-            s = f"thread id={threading.get_ident()} " + str(s)
-            self.print_strings.emit(s, logging.INFO)
+        state = 1 if axis_value >= 0.5 else (-1 if axis_value <= -0.5 else 0)
+        prev = self._prev_axis_button_state.get(mapped_name, 0)
+        if state == prev:
+            return
 
-    def warning(self, s, force=False):
-        if force or not self.isCanceled:
-            s = f"thread id={threading.get_ident()} " + str(s)
-            self.print_strings.emit(s, logging.WARNING)
+        if prev != 0:
+            self._emit_legacy(mapped_name, False)
+        if state != 0:
+            self._emit_legacy(mapped_name, True)
 
-    def error(self, s, force=False):
-        if force or not self.isCanceled:
-            s = f"thread id={threading.get_ident()} " + str(s)
-            self.print_strings.emit(s, logging.ERROR)
+        self._prev_axis_button_state[mapped_name] = state
 
-    def critical(self, s, force=False):
-        if force or not self.isCanceled:
-            s = f"thread id={threading.get_ident()} " + str(s)
-            self.print_strings.emit(s, logging.CRITICAL)
+    def _handle_button(self, button_index: int, pressed: bool) -> None:
+        mapped_name = self.keymap.get(f"button.{button_index}")
+        if mapped_name is None:
+            return
 
+        prev = self._prev_button_state.get(mapped_name, False)
+        if prev == pressed:
+            return
 
-def j_stick():
-    logger = getLogger(__name__)
-    logger.addHandler(NullHandler())
-    logger.addHandler(StreamHandler())
-    logger.setLevel(DEBUG)
-    logger.propagate = True
-    logger.debug(f"スティック情報取得プロセスID: {os.getpid()}")
+        self._prev_button_state[mapped_name] = pressed
+        self._emit_legacy(mapped_name, pressed)
 
-    stick_shm = shared_memory.SharedMemory(name="stick")  # 共有メモリを取得
-    stick = np.ndarray((4, 1), dtype=np.float64, buffer=stick_shm.buf)
-    num_queue = 3
-    queue_0 = collections.deque([], num_queue)
-    queue_1 = collections.deque([], num_queue)
-    queue_2 = collections.deque([], num_queue)
-    queue_3 = collections.deque([], num_queue)
-    initialized = False
-    try:
-        while True:
-            try:
-                if not initialized:
-                    pygame.init()
-                    pygame.joystick.init()
-                    joystick = pygame.joystick.Joystick(0)
-                    initialized = True
-            except pygame.error as e:
-                # print(e)
-                pass
-            except Exception:
+    def _handle_hat(self, hat_value: tuple[int, int]) -> None:
+        mapping = {
+            "TOP": hat_value == (0, 1),
+            "BTM": hat_value == (0, -1),
+            "LEFT": hat_value == (-1, 0),
+            "RIGHT": hat_value == (1, 0),
+        }
+
+        for physical_name, active in mapping.items():
+            mapped_name = self.keymap.get(physical_name)
+            if mapped_name is None:
                 continue
 
-            for e in pygame.event.get():
-                if e.type == pygame.locals.JOYAXISMOTION:
-                    queue_0.append(joystick.get_axis(0))
-                    queue_1.append(joystick.get_axis(1))
-                    queue_2.append(joystick.get_axis(2))
-                    queue_3.append(joystick.get_axis(3))
-                    stick[0] = sum(queue_0) / num_queue  # left horizontal
-                    stick[1] = sum(queue_1) / num_queue  # left vertical
-                    stick[2] = sum(queue_2) / num_queue  # right horizontal
-                    stick[3] = sum(queue_3) / num_queue  # right vertical
-                elif e.type == pygame.JOYDEVICEREMOVED:
-                    stick[0] = 0  # left horizontal スティックの位置を初期位置に戻す
-                    stick[1] = 0  # left vertical
-                    stick[2] = 0  # right horizontal
-                    stick[3] = 0  # right vertical
-                    return False
-    except KeyboardInterrupt:
-        pass
+            prev = self._prev_hat_state.get(physical_name, False)
+            if prev == active:
+                continue
 
+            self._prev_hat_state[physical_name] = active
+            self._emit_legacy(mapped_name, active)
 
-if __name__ == "__main__":
-    # 環境変数にPySide6を登録
-    dir_name = os.path.dirname(PySide6.__file__)
-    pluginPath = os.path.join(dir_name, "plugins", "platforms")
-    os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = pluginPath
-    setting = Setting.alternate("../config/settings.toml")
+    def _emit_axis(self) -> None:
+        if self.joystick_ is None:
+            return
 
-    app = QtWidgets.QApplication(sys.argv)
-    w = SettingWindow(_setting=setting)
-    w.show()
-    app.exec()
+        left_h = self.joystick_.get_axis(0)
+        left_v = self.joystick_.get_axis(1)
+        right_h = self.joystick_.get_axis(2)
+        right_v = self.joystick_.get_axis(3)
+
+        if not self.use_Lstick:
+            left_h = 0.0
+            left_v = 0.0
+        if not self.use_Rstick:
+            right_h = 0.0
+            right_v = 0.0
+
+        self.AXIS_MOVED.emit(left_h, left_v, right_h, right_v)
+        self.axis_moved.emit(left_h, left_v, right_h, right_v)
+
+        for axis_index, axis_value in enumerate([left_h, left_v, right_h, right_v]):
+            self._handle_axis_as_button(axis_index, axis_value)
+
+    def _poll_trigger_axes(self) -> None:
+        if self.joystick_ is None:
+            return
+
+        for axis_index in (4, 5):
+            try:
+                axis_value = self.joystick_.get_axis(axis_index)
+            except Exception:
+                continue
+            self._handle_axis_as_button(axis_index, axis_value)
+
+    @Slot()
+    def _poll_once(self) -> None:
+        if not self.is_alive:
+            return
+
+        if self.pause:
+            return
+
+        if self.no_joystick:
+            # pygame.event.pump()
+            # self.connect_joystick()
+            return
+
+        try:
+            pygame.event.pump()
+
+            if self.joystick_ is None:
+                self.no_joystick = True
+                return
+
+            self._emit_axis()
+            self._poll_trigger_axes()
+
+            for event in pygame.event.get():
+                if event.type == pygame.JOYBUTTONDOWN:
+                    self._handle_button(event.button, True)
+                elif event.type == pygame.JOYBUTTONUP:
+                    self._handle_button(event.button, False)
+                elif event.type == pygame.JOYHATMOTION:
+                    self._handle_hat(event.value)
+                elif event.type == pygame.JOYDEVICEREMOVED:
+                    self.warning("コントローラとの接続が切断されました。")
+                    self.no_joystick = True
+                    self.joystick_ = None
+                    self._prev_button_state.clear()
+                    self._prev_axis_button_state.clear()
+                    self._prev_hat_state.clear()
+
+        except Exception as exc:
+            self.error(f"Gamepad poll error: {exc}")
