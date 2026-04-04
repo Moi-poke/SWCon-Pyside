@@ -1,30 +1,36 @@
-# License
+# MIT License
 
-### Copyright © `2022` `Moi`
+Copyright (c) 2026 Moi
 
-### GNU LGPL v3
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
 ---
-The ui files, mainly mainwindow.py, belong to this Licence.
 
-### MIT License
----
-The remaining files that do not belong to GNU LGPL v3 belong to the Licence.
+## Third-Party Notice
 
+This repository depends on third-party libraries, including PySide6 / Qt for Python.
 
-## Links
------
-See `COPYING.LESSER` for GNU LGPL v3 license.
+The source code in this repository is licensed under the MIT License unless
+otherwise explicitly stated. Third-party libraries are provided under their own
+licenses and are **not** relicensed by this file.
 
-For the MIT License and some other external links, see below.
-
-
-- [GNU LGPL v3 license in Markdown][1], hosted in [IQAndreas/**markdown-licenses**](http://github.com/IQAndreas/markdown-licenses/) on GitHub
-- [Summary of GNU LGPL v3 license][2] on TLDRLegal
-- [MIT license in Markdown][3], hosted in [IQAndreas/**markdown-licenses**](http://github.com/IQAndreas/markdown-licenses/) on GitHub
-- [Summary of MIT license][4] on TLDRLegal
-
-
-[1]: http://github.com/IQAndreas/markdown-licenses/blob/master/gnu-lgpl-v3.0.md#gnu-lesser-general-public-license
-[2]: http://tldrlegal.com/license/gnu-lesser-general-public-license-v3-(lgpl-3)
-[3]: http://github.com/IQAndreas/markdown-licenses/blob/master/mit.md#the-mit-license-mit
-[4]: http://tldrlegal.com/license/mit-license
+Please see:
+- `THIRD_PARTY_NOTICES.md`
+- `COPYING.LESSER`
+``
