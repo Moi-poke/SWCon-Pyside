@@ -223,17 +223,21 @@ class CommandBase(QObject):
             self.warning("No latest frame available.")
             return {}
 
-        src_for_match = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY) if use_gray else src
+        color_mode = ColorType.GRAY if use_gray else ColorType.COLOR
+        src_for_match = self.set_img_color_type(src, color_mode, 128)
+
         if trim is not None:
             src_for_match = src_for_match[trim[1] : trim[3], trim[0] : trim[2]]
 
         results: dict[str, dict[str, Any]] = {}
 
         for template_path in template_path_list:
-            template = self.read_template(template_path, use_gray)
+            template = self.read_template(template_path)
             if template is None:
                 results[template_path] = {"score": 0.0, "position": np.array([])}
                 continue
+
+            template = self.set_img_color_type(template, color_mode, 128)
 
             method = cv2.TM_CCOEFF_NORMED
             res = cv2.matchTemplate(src_for_match, template, method)
@@ -270,10 +274,9 @@ class CommandBase(QObject):
 
         return results
 
-    def read_template(self, template_path: str, use_gray: bool) -> Optional[np.ndarray]:
+    def read_template(self, template_path: str) -> Optional[np.ndarray]:
         full_path = pathlib.Path(self.TEMPLATE_PATH) / template_path
-        flags = cv2.IMREAD_GRAYSCALE if use_gray else cv2.IMREAD_COLOR
-        img = cv2.imread(str(full_path), flags)
+        img = cv2.imread(str(full_path), cv2.IMREAD_COLOR)
         if img is None:
             self.error(f"テンプレート画像の読み込みに失敗しました: {full_path}")
         return img
@@ -313,12 +316,7 @@ class CommandBase(QObject):
         else:
             template_file = pathlib.Path(self.TEMPLATE_PATH) / template_path
 
-        template = cv2.imread(
-            str(template_file),
-            cv2.IMREAD_GRAYSCALE
-            if color_mode in (ColorType.GRAY, ColorType.BINARY)
-            else cv2.IMREAD_COLOR,
-        )
+        template = cv2.imread(str(template_file), cv2.IMREAD_COLOR)
         if template is None:
             self.error(f"テンプレート画像の読み込みに失敗しました: {template_file}")
             return False
@@ -375,17 +373,38 @@ class CommandBase(QObject):
         return False
 
     def set_img_color_type(self, src, color_mode, binary_threshold):
+        if src is None:
+            raise ValueError("Input image is None")
+
         match color_mode:
             case ColorType.COLOR:
+                # すでに BGR 相当ならそのまま返す
+                if len(src.shape) == 2:
+                    return cv2.cvtColor(src, cv2.COLOR_GRAY2BGR)
+                if len(src.shape) == 3 and src.shape[2] == 4:
+                    return cv2.cvtColor(src, cv2.COLOR_BGRA2BGR)
                 return src
+
             case ColorType.GRAY:
+                if len(src.shape) == 2:
+                    return src
+                if len(src.shape) == 3 and src.shape[2] == 4:
+                    return cv2.cvtColor(src, cv2.COLOR_BGRA2GRAY)
                 return cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
+
             case ColorType.BINARY:
-                gray = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
+                if len(src.shape) == 2:
+                    gray = src
+                elif len(src.shape) == 3 and src.shape[2] == 4:
+                    gray = cv2.cvtColor(src, cv2.COLOR_BGRA2GRAY)
+                else:
+                    gray = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
+
                 _, binary = cv2.threshold(
                     gray, binary_threshold, 255, cv2.THRESH_BINARY
                 )
                 return binary
+
             case _:
                 raise Exception("Color setting failed")
 
