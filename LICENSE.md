@@ -33,4 +33,3 @@ licenses and are **not** relicensed by this file.
 Please see:
 - `THIRD_PARTY_NOTICES.md`
 - `COPYING.LESSER`
-``
