@@ -49,11 +49,34 @@ Poke-Controllerからの変更点は下記
 - キーボード操作はそのうち実装したい
 
 
-## License
----
-![License logo](https://www.gnu.org/graphics/lgplv3-147x51.png)
 
-This repository is mainly licensed under the [GNU LGPL v3](http://github.com/IQAndreas/markdown-licenses/blob/master/gnu-lgpl-v3.0.md#gnu-lesser-general-public-license).
+## License
+
+This repository's source code is licensed under the **MIT License** unless
+otherwise explicitly stated. See [LICENSE.md](./LICENSE.md) for details.
+
+### Third-party dependencies
+
+This project uses **PySide6 / Qt for Python** and other third-party components.
+Those dependencies are provided under their own licenses and are **not**
+relicensed by this repository.
+
+In particular, PySide6 / Qt for Python is available under open source
+licenses (including LGPLv3 / GPLv2 / GPLv3) or under a commercial license.
+If you redistribute binaries, bundled applications, or installers that include
+PySide6 / Qt, you are responsible for complying with the applicable Qt / PySide6
+license terms.
+
+For more information, see:
+- [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)
+- `COPYING.LESSER`
+
+### Notes
+
+- The code written specifically for this project is intended to remain under MIT.
+- Third-party libraries keep their original licenses.
+- If you modify or redistribute Qt / PySide6 related components, additional
+  obligations may apply depending on the license mode you use.
 
 ### 免責事項
 このプログラム、および同梱のファイルの使用、または使用不具合等により生じたいかなる損害に関しまして、作者は一切責任を負いません。
