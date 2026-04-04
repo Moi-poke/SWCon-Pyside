@@ -69,7 +69,7 @@ license terms.
 
 For more information, see:
 - [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)
-- `COPYING.LESSER`
+- [COPYING.LESSER.md](./COPYING.LESSER.md)
 
 ### Notes
 
