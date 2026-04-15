@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Visual Macro Editor</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="toolbar">
+      <div class="toolbar-group">
+        <label for="file-path-input">保存先</label>
+        <input id="file-path-input" type="text" value="sample_macro.json" />
+
+        <label for="recent-files-button">最近</label>
+        <div class="recent-files-dropdown">
+          <button id="recent-files-button" type="button">最近使ったファイル</button>
+          <div id="recent-files-menu" class="recent-files-menu" hidden></div>
+        </div>
+      </div>
+
+      <div class="toolbar-group toolbar-actions">
+        <button id="new-button" type="button">新規</button>
+        <button id="load-button" type="button">開く...</button>
+        <button id="save-button" type="button">保存</button>
+        <button id="save-as-button" type="button">名前を付けて保存...</button>
+        <button id="run-button" type="button">実行</button>
+        <button id="stop-button" type="button">停止</button>
+      </div>
+    </header>
+
+    <main class="main-layout">
+      <aside class="side-panel">
+        <section class="panel-section">
+          <h2>テンプレート</h2>
+          <button id="refresh-templates-button" type="button">一覧更新</button>
+          <select id="template-select" size="10"></select>
+        </section>
+
+        <section class="panel-section">
+          <h2>メタデータ</h2>
+
+          <label for="meta-name-input">名前</label>
+          <input id="meta-name-input" type="text" value="" />
+
+          <label for="meta-description-input">説明</label>
+          <textarea id="meta-description-input" spellcheck="false"></textarea>
+
+          <label for="meta-tags-input">タグ（カンマ区切り）</label>
+          <input id="meta-tags-input" type="text" value="" />
+        </section>
+
+        <section class="panel-section">
+          <h2>実行用 JSON</h2>
+          <textarea id="program-json-output" spellcheck="false"></textarea>
+        </section>
+      </aside>
+
+      <section class="editor-panel">
+        <div id="blockly-div"></div>
+      </section>
+    </main>
+
+    <footer class="status-bar">
+      <span id="status-text">準備完了</span>
+    </footer>
+  </div>
+
+  <script type="module" src="blocks.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

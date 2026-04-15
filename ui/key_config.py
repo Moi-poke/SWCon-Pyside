@@ -3,7 +3,7 @@
 ################################################################################
 ## Form generated from reading UI file 'key_config.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.3.1
+## Created by: Qt User Interface Compiler version 6.11.0
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -24,7 +24,7 @@ class Ui_Form(object):
         if not Form.objectName():
             Form.setObjectName(u"Form")
         Form.resize(690, 337)
-        sizePolicy = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        sizePolicy = QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(Form.sizePolicy().hasHeightForWidth())
@@ -300,7 +300,7 @@ class Ui_Form(object):
         self.line.setMinimumSize(QSize(5, 0))
         self.line.setFrameShadow(QFrame.Sunken)
         self.line.setLineWidth(1)
-        self.line.setFrameShape(QFrame.VLine)
+        self.line.setFrameShape(QFrame.Shape.VLine)
 
         self.gridLayout.addWidget(self.line, 0, 1, 1, 1, Qt.AlignHCenter)
 
@@ -581,7 +581,7 @@ class Ui_Form(object):
 
         self.horizontalLayout.addWidget(self.pushButton_20)
 
-        self.horizontalSpacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+        self.horizontalSpacer = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         self.horizontalLayout.addItem(self.horizontalSpacer)
 

@@ -1,0 +1,43 @@
+{
+  "kind": "categoryToolbox",
+  "contents": [
+    {
+      "kind": "category",
+      "name": "操作",
+      "categorystyle": "logic_category",
+      "contents": [
+        { "kind": "block", "type": "vm_press" },
+        { "kind": "block", "type": "vm_press_many" },
+        { "kind": "block", "type": "vm_mash" },
+        { "kind": "block", "type": "vm_hold" },
+        { "kind": "block", "type": "vm_hold_end" },
+        { "kind": "block", "type": "vm_stick_move" },
+        { "kind": "block", "type": "vm_stick_hold" },
+        { "kind": "block", "type": "vm_stick_release" },
+        { "kind": "block", "type": "vm_wait" },
+        { "kind": "block", "type": "vm_print" },
+        { "kind": "block", "type": "vm_finish" }
+      ]
+    },
+    {
+  "kind": "category",
+  "name": "制御",
+  "categorystyle": "loop_category",
+  "contents": [
+    { "kind": "block", "type": "vm_if" },
+    { "kind": "block", "type": "vm_repeat" },
+    { "kind": "block", "type": "vm_while_alive" }
+  ]
+},
+{
+  "kind": "category",
+  "name": "条件",
+  "categorystyle": "procedure_category",
+  "contents": [
+    { "kind": "block", "type": "vm_image_exists" },
+    { "kind": "block", "type": "vm_wait_until_image" },
+    { "kind": "block", "type": "vm_wait_until_not_image" }
+  ]
+}
+  ]
+}

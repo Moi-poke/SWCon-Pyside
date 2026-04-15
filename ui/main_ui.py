@@ -3,7 +3,7 @@
 ################################################################################
 ## Form generated from reading UI file 'mainwindow.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.3.1
+## Created by: Qt User Interface Compiler version 6.11.0
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -30,8 +30,8 @@ class Ui_MainWindow(object):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
         MainWindow.setEnabled(True)
-        MainWindow.resize(1035, 798)
-        sizePolicy = QSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
+        MainWindow.resize(1038, 813)
+        sizePolicy = QSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.MinimumExpanding)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(MainWindow.sizePolicy().hasHeightForWidth())
@@ -39,9 +39,9 @@ class Ui_MainWindow(object):
         font = QFont()
         font.setFamilies([u"Meiryo UI"])
         MainWindow.setFont(font)
-        MainWindow.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        MainWindow.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         MainWindow.setDocumentMode(False)
-        MainWindow.setDockOptions(QMainWindow.AllowNestedDocks|QMainWindow.AllowTabbedDocks|QMainWindow.AnimatedDocks)
+        MainWindow.setDockOptions(QMainWindow.DockOption.AllowNestedDocks|QMainWindow.DockOption.AllowTabbedDocks|QMainWindow.DockOption.AnimatedDocks)
         self.actionL_Stick_Control = QAction(MainWindow)
         self.actionL_Stick_Control.setObjectName(u"actionL_Stick_Control")
         self.actionL_Stick_Control.setCheckable(True)
@@ -74,8 +74,8 @@ class Ui_MainWindow(object):
         if QIcon.hasThemeIcon(iconThemeName):
             icon = QIcon.fromTheme(iconThemeName)
         else:
-            icon.addFile(u"C:/Users/Moi/PycharmProjects/SWCon-Pyside/ui", QSize(), QIcon.Normal, QIcon.Off)
-        
+            icon.addFile(u"../../Users/Moi/PycharmProjects/SWCon-Pyside/ui", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+
         self.actionQuit.setIcon(icon)
         self.actionShow_Serial = QAction(MainWindow)
         self.actionShow_Serial.setObjectName(u"actionShow_Serial")
@@ -110,7 +110,7 @@ class Ui_MainWindow(object):
         self.gridLayout_4.setObjectName(u"gridLayout_4")
         self.CaptureImageArea = ScaledLabel(self.centralwidget)
         self.CaptureImageArea.setObjectName(u"CaptureImageArea")
-        sizePolicy1 = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        sizePolicy1 = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         sizePolicy1.setHorizontalStretch(0)
         sizePolicy1.setVerticalStretch(0)
         sizePolicy1.setHeightForWidth(self.CaptureImageArea.sizePolicy().hasHeightForWidth())
@@ -118,23 +118,23 @@ class Ui_MainWindow(object):
         self.CaptureImageArea.setMinimumSize(QSize(640, 360))
         self.CaptureImageArea.setMaximumSize(QSize(1920, 1080))
         self.CaptureImageArea.setSizeIncrement(QSize(0, 0))
-        self.CaptureImageArea.setCursor(QCursor(Qt.CrossCursor))
-        self.CaptureImageArea.setLayoutDirection(Qt.LeftToRight)
+        self.CaptureImageArea.setCursor(QCursor(Qt.CursorShape.CrossCursor))
+        self.CaptureImageArea.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
         self.CaptureImageArea.setAutoFillBackground(False)
         self.CaptureImageArea.setStyleSheet(u"background-color:rgb(138, 230, 255)")
-        self.CaptureImageArea.setFrameShape(QFrame.StyledPanel)
-        self.CaptureImageArea.setFrameShadow(QFrame.Sunken)
+        self.CaptureImageArea.setFrameShape(QFrame.Shape.StyledPanel)
+        self.CaptureImageArea.setFrameShadow(QFrame.Shadow.Sunken)
         self.CaptureImageArea.setLineWidth(1)
         self.CaptureImageArea.setScaledContents(True)
-        self.CaptureImageArea.setAlignment(Qt.AlignCenter)
+        self.CaptureImageArea.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.CaptureImageArea.setMargin(0)
 
-        self.gridLayout_4.addWidget(self.CaptureImageArea, 2, 0, 1, 1, Qt.AlignHCenter|Qt.AlignVCenter)
+        self.gridLayout_4.addWidget(self.CaptureImageArea, 2, 0, 1, 1, Qt.AlignmentFlag.AlignHCenter|Qt.AlignmentFlag.AlignVCenter)
 
         self.frame = QFrame(self.centralwidget)
         self.frame.setObjectName(u"frame")
-        self.frame.setFrameShape(QFrame.NoFrame)
-        self.frame.setFrameShadow(QFrame.Plain)
+        self.frame.setFrameShape(QFrame.Shape.NoFrame)
+        self.frame.setFrameShadow(QFrame.Shadow.Plain)
         self.gridLayout_2 = QGridLayout(self.frame)
         self.gridLayout_2.setSpacing(0)
         self.gridLayout_2.setObjectName(u"gridLayout_2")
@@ -144,9 +144,9 @@ class Ui_MainWindow(object):
         self.tabWidget.setMaximumSize(QSize(16777215, 121))
         self.tabWidget.setAutoFillBackground(True)
         self.tabWidget.setStyleSheet(u"")
-        self.tabWidget.setTabPosition(QTabWidget.West)
-        self.tabWidget.setTabShape(QTabWidget.Rounded)
-        self.tabWidget.setElideMode(Qt.ElideNone)
+        self.tabWidget.setTabPosition(QTabWidget.TabPosition.West)
+        self.tabWidget.setTabShape(QTabWidget.TabShape.Rounded)
+        self.tabWidget.setElideMode(Qt.TextElideMode.ElideNone)
         self.tabWidget.setUsesScrollButtons(False)
         self.tabWidget.setDocumentMode(False)
         self.tabWidget.setTabsClosable(False)
@@ -162,14 +162,14 @@ class Ui_MainWindow(object):
 
         self.gridLayout_5.addWidget(self.toolButtonOpenPythonDir, 0, 5, 1, 1)
 
-        self.horizontalSpacer = QSpacerItem(419, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+        self.horizontalSpacer = QSpacerItem(419, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         self.gridLayout_5.addItem(self.horizontalSpacer, 1, 0, 1, 1)
 
         self.pushButton_PythonReload = QPushButton(self.tab)
         self.pushButton_PythonReload.setObjectName(u"pushButton_PythonReload")
         self.pushButton_PythonReload.setEnabled(True)
-        sizePolicy2 = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        sizePolicy2 = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         sizePolicy2.setHorizontalStretch(0)
         sizePolicy2.setVerticalStretch(0)
         sizePolicy2.setHeightForWidth(self.pushButton_PythonReload.sizePolicy().hasHeightForWidth())
@@ -201,6 +201,70 @@ class Ui_MainWindow(object):
         self.gridLayout_5.addWidget(self.pushButton_PythonStart, 1, 2, 1, 2)
 
         self.tabWidget.addTab(self.tab, "")
+        self.tab_3 = QWidget()
+        self.tab_3.setObjectName(u"tab_3")
+        self.tab_3.setAutoFillBackground(True)
+        self.gridLayout_10 = QGridLayout(self.tab_3)
+        self.gridLayout_10.setObjectName(u"gridLayout_10")
+        self.pushButton_VisualMacroReload = QPushButton(self.tab_3)
+        self.pushButton_VisualMacroReload.setObjectName(u"pushButton_VisualMacroReload")
+        sizePolicy2.setHeightForWidth(self.pushButton_VisualMacroReload.sizePolicy().hasHeightForWidth())
+        self.pushButton_VisualMacroReload.setSizePolicy(sizePolicy2)
+        self.pushButton_VisualMacroReload.setMinimumSize(QSize(80, 0))
+
+        self.gridLayout_10.addWidget(self.pushButton_VisualMacroReload, 1, 5, 1, 1)
+
+        self.toolButton_OpenVisualMacroDir = QToolButton(self.tab_3)
+        self.toolButton_OpenVisualMacroDir.setObjectName(u"toolButton_OpenVisualMacroDir")
+
+        self.gridLayout_10.addWidget(self.toolButton_OpenVisualMacroDir, 0, 8, 1, 1)
+
+        self.comboBox_VisualMacro = QComboBox(self.tab_3)
+        self.comboBox_VisualMacro.setObjectName(u"comboBox_VisualMacro")
+
+        self.gridLayout_10.addWidget(self.comboBox_VisualMacro, 0, 0, 1, 8)
+
+        self.pushButton_VisualMacroStop = QPushButton(self.tab_3)
+        self.pushButton_VisualMacroStop.setObjectName(u"pushButton_VisualMacroStop")
+        sizePolicy2.setHeightForWidth(self.pushButton_VisualMacroStop.sizePolicy().hasHeightForWidth())
+        self.pushButton_VisualMacroStop.setSizePolicy(sizePolicy2)
+        self.pushButton_VisualMacroStop.setMinimumSize(QSize(80, 0))
+
+        self.gridLayout_10.addWidget(self.pushButton_VisualMacroStop, 1, 7, 1, 2)
+
+        self.pushButton_VisualMacroDelete = QPushButton(self.tab_3)
+        self.pushButton_VisualMacroDelete.setObjectName(u"pushButton_VisualMacroDelete")
+
+        self.gridLayout_10.addWidget(self.pushButton_VisualMacroDelete, 1, 3, 1, 1)
+
+        self.horizontalSpacer_3 = QSpacerItem(66, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+
+        self.gridLayout_10.addItem(self.horizontalSpacer_3, 1, 0, 1, 1)
+
+        self.pushButton_VisualMacroStart = QPushButton(self.tab_3)
+        self.pushButton_VisualMacroStart.setObjectName(u"pushButton_VisualMacroStart")
+        sizePolicy2.setHeightForWidth(self.pushButton_VisualMacroStart.sizePolicy().hasHeightForWidth())
+        self.pushButton_VisualMacroStart.setSizePolicy(sizePolicy2)
+        self.pushButton_VisualMacroStart.setMinimumSize(QSize(80, 0))
+
+        self.gridLayout_10.addWidget(self.pushButton_VisualMacroStart, 1, 6, 1, 1)
+
+        self.pushButton_VisualMacroDuplicate = QPushButton(self.tab_3)
+        self.pushButton_VisualMacroDuplicate.setObjectName(u"pushButton_VisualMacroDuplicate")
+
+        self.gridLayout_10.addWidget(self.pushButton_VisualMacroDuplicate, 1, 2, 1, 1)
+
+        self.pushButton_VisualMacroOpen = QPushButton(self.tab_3)
+        self.pushButton_VisualMacroOpen.setObjectName(u"pushButton_VisualMacroOpen")
+
+        self.gridLayout_10.addWidget(self.pushButton_VisualMacroOpen, 1, 4, 1, 1)
+
+        self.pushButton_VisualMacroNew = QPushButton(self.tab_3)
+        self.pushButton_VisualMacroNew.setObjectName(u"pushButton_VisualMacroNew")
+
+        self.gridLayout_10.addWidget(self.pushButton_VisualMacroNew, 1, 1, 1, 1)
+
+        self.tabWidget.addTab(self.tab_3, "")
         self.tab_2 = QWidget()
         self.tab_2.setObjectName(u"tab_2")
         self.tab_2.setAutoFillBackground(True)
@@ -224,7 +288,7 @@ class Ui_MainWindow(object):
 
         self.gridLayout_6.addWidget(self.comboBox_MCU, 0, 0, 1, 4)
 
-        self.horizontalSpacer_2 = QSpacerItem(419, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+        self.horizontalSpacer_2 = QSpacerItem(419, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         self.gridLayout_6.addItem(self.horizontalSpacer_2, 1, 0, 1, 1)
 
@@ -253,14 +317,14 @@ class Ui_MainWindow(object):
 
         self.frame_2 = QFrame(self.centralwidget)
         self.frame_2.setObjectName(u"frame_2")
-        sizePolicy3 = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        sizePolicy3 = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
         sizePolicy3.setHorizontalStretch(0)
         sizePolicy3.setVerticalStretch(0)
         sizePolicy3.setHeightForWidth(self.frame_2.sizePolicy().hasHeightForWidth())
         self.frame_2.setSizePolicy(sizePolicy3)
         self.frame_2.setMaximumSize(QSize(16777215, 70))
-        self.frame_2.setFrameShape(QFrame.NoFrame)
-        self.frame_2.setFrameShadow(QFrame.Plain)
+        self.frame_2.setFrameShape(QFrame.Shape.NoFrame)
+        self.frame_2.setFrameShadow(QFrame.Shadow.Plain)
         self.gridLayout_3 = QGridLayout(self.frame_2)
         self.gridLayout_3.setSpacing(2)
         self.gridLayout_3.setObjectName(u"gridLayout_3")
@@ -268,8 +332,8 @@ class Ui_MainWindow(object):
         self.lineEditComPort = QLineEdit(self.frame_2)
         self.lineEditComPort.setObjectName(u"lineEditComPort")
         self.lineEditComPort.setMaximumSize(QSize(75, 16777215))
-        self.lineEditComPort.setFocusPolicy(Qt.StrongFocus)
-        self.lineEditComPort.setAlignment(Qt.AlignCenter)
+        self.lineEditComPort.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.lineEditComPort.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lineEditComPort.setClearButtonEnabled(False)
 
         self.gridLayout_3.addWidget(self.lineEditComPort, 0, 4, 1, 1)
@@ -281,8 +345,8 @@ class Ui_MainWindow(object):
 
         self.line = QFrame(self.frame_2)
         self.line.setObjectName(u"line")
-        self.line.setFrameShape(QFrame.VLine)
-        self.line.setFrameShadow(QFrame.Sunken)
+        self.line.setFrameShape(QFrame.Shape.VLine)
+        self.line.setFrameShadow(QFrame.Shadow.Sunken)
 
         self.gridLayout_3.addWidget(self.line, 0, 6, 2, 1)
 
@@ -313,22 +377,22 @@ class Ui_MainWindow(object):
         self.lineEditCameraID = QLineEdit(self.frame_2)
         self.lineEditCameraID.setObjectName(u"lineEditCameraID")
         self.lineEditCameraID.setMaximumSize(QSize(100, 16777215))
-        self.lineEditCameraID.setFocusPolicy(Qt.StrongFocus)
-        self.lineEditCameraID.setAlignment(Qt.AlignCenter)
+        self.lineEditCameraID.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.lineEditCameraID.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.gridLayout_3.addWidget(self.lineEditCameraID, 0, 3, 1, 1)
 
         self.lineEditFPS = QLineEdit(self.frame_2)
         self.lineEditFPS.setObjectName(u"lineEditFPS")
         self.lineEditFPS.setMaximumSize(QSize(80, 16777215))
-        self.lineEditFPS.setFocusPolicy(Qt.StrongFocus)
-        self.lineEditFPS.setAlignment(Qt.AlignCenter)
+        self.lineEditFPS.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.lineEditFPS.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.gridLayout_3.addWidget(self.lineEditFPS, 0, 2, 1, 1)
 
         self.label = QLabel(self.frame_2)
         self.label.setObjectName(u"label")
-        self.label.setAlignment(Qt.AlignRight|Qt.AlignTrailing|Qt.AlignVCenter)
+        self.label.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
 
         self.gridLayout_3.addWidget(self.label, 0, 1, 1, 1)
 
@@ -350,7 +414,7 @@ class Ui_MainWindow(object):
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(MainWindow)
         self.menubar.setObjectName(u"menubar")
-        self.menubar.setGeometry(QRect(0, 0, 1035, 22))
+        self.menubar.setGeometry(QRect(0, 0, 1038, 33))
         self.menuMenu = QMenu(self.menubar)
         self.menuMenu.setObjectName(u"menuMenu")
         self.menuOption = QMenu(self.menubar)
@@ -374,13 +438,13 @@ class Ui_MainWindow(object):
         sizePolicy.setHeightForWidth(self.dockWidget_log.sizePolicy().hasHeightForWidth())
         self.dockWidget_log.setSizePolicy(sizePolicy)
         self.dockWidget_log.setMaximumSize(QSize(524287, 524287))
-        self.dockWidget_log.setContextMenuPolicy(Qt.NoContextMenu)
+        self.dockWidget_log.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
         self.dockWidget_log.setAutoFillBackground(True)
-        self.dockWidget_log.setFeatures(QDockWidget.DockWidgetClosable|QDockWidget.DockWidgetFloatable|QDockWidget.DockWidgetMovable)
-        self.dockWidget_log.setAllowedAreas(Qt.AllDockWidgetAreas)
+        self.dockWidget_log.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetClosable|QDockWidget.DockWidgetFeature.DockWidgetFloatable|QDockWidget.DockWidgetFeature.DockWidgetMovable)
+        self.dockWidget_log.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
         self.dockWidgetContents = QWidget()
         self.dockWidgetContents.setObjectName(u"dockWidgetContents")
-        sizePolicy4 = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        sizePolicy4 = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         sizePolicy4.setHorizontalStretch(0)
         sizePolicy4.setVerticalStretch(0)
         sizePolicy4.setHeightForWidth(self.dockWidgetContents.sizePolicy().hasHeightForWidth())
@@ -394,20 +458,20 @@ class Ui_MainWindow(object):
         self.plainTextEdit.setEnabled(True)
         self.plainTextEdit.setUndoRedoEnabled(True)
         self.plainTextEdit.setCursorWidth(-2)
-        self.plainTextEdit.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.plainTextEdit.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.plainTextEdit.setBackgroundVisible(False)
 
         self.gridLayout.addWidget(self.plainTextEdit, 0, 0, 1, 1)
 
         self.dockWidget_log.setWidget(self.dockWidgetContents)
-        MainWindow.addDockWidget(Qt.BottomDockWidgetArea, self.dockWidget_log)
+        MainWindow.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.dockWidget_log)
         self.statusbar = QStatusBar(MainWindow)
         self.statusbar.setObjectName(u"statusbar")
         self.statusbar.setSizeGripEnabled(True)
         MainWindow.setStatusBar(self.statusbar)
         self.dockWidget_left = QDockWidget(MainWindow)
         self.dockWidget_left.setObjectName(u"dockWidget_left")
-        self.dockWidget_left.setFeatures(QDockWidget.DockWidgetClosable|QDockWidget.DockWidgetFloatable|QDockWidget.DockWidgetMovable)
+        self.dockWidget_left.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetClosable|QDockWidget.DockWidgetFeature.DockWidgetFloatable|QDockWidget.DockWidgetFeature.DockWidgetMovable)
         self.dockWidgetContents_2 = QWidget()
         self.dockWidgetContents_2.setObjectName(u"dockWidgetContents_2")
         self.horizontalLayout_2 = QHBoxLayout(self.dockWidgetContents_2)
@@ -418,18 +482,18 @@ class Ui_MainWindow(object):
         self.joycon_l.setObjectName(u"joycon_l")
         self.joycon_l.setMinimumSize(QSize(150, 0))
         self.joycon_l.setMaximumSize(QSize(150, 16777215))
-        self.joycon_l.setFrameShape(QFrame.StyledPanel)
-        self.joycon_l.setFrameShadow(QFrame.Raised)
+        self.joycon_l.setFrameShape(QFrame.Shape.StyledPanel)
+        self.joycon_l.setFrameShadow(QFrame.Shadow.Raised)
         self.gridLayout_18 = QGridLayout(self.joycon_l)
         self.gridLayout_18.setObjectName(u"gridLayout_18")
         self.frame_15 = QFrame(self.joycon_l)
         self.frame_15.setObjectName(u"frame_15")
-        self.frame_15.setFrameShadow(QFrame.Raised)
+        self.frame_15.setFrameShadow(QFrame.Shadow.Raised)
         self.verticalLayout_5 = QVBoxLayout(self.frame_15)
         self.verticalLayout_5.setSpacing(5)
         self.verticalLayout_5.setObjectName(u"verticalLayout_5")
         self.verticalLayout_5.setContentsMargins(0, 0, 0, 0)
-        self.verticalSpacer_5 = QSpacerItem(0, 35, QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.verticalSpacer_5 = QSpacerItem(0, 35, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
 
         self.verticalLayout_5.addItem(self.verticalSpacer_5)
 
@@ -449,7 +513,7 @@ class Ui_MainWindow(object):
         self.BTN_zl.setCheckable(True)
         self.BTN_zl.setFlat(True)
 
-        self.verticalLayout_5.addWidget(self.BTN_zl, 0, Qt.AlignHCenter|Qt.AlignVCenter)
+        self.verticalLayout_5.addWidget(self.BTN_zl, 0, Qt.AlignmentFlag.AlignHCenter|Qt.AlignmentFlag.AlignVCenter)
 
         self.BTN_l = QPushButton(self.frame_15)
         self.BTN_l.setObjectName(u"BTN_l")
@@ -461,17 +525,17 @@ class Ui_MainWindow(object):
         self.BTN_l.setCheckable(True)
         self.BTN_l.setFlat(False)
 
-        self.verticalLayout_5.addWidget(self.BTN_l, 0, Qt.AlignHCenter)
+        self.verticalLayout_5.addWidget(self.BTN_l, 0, Qt.AlignmentFlag.AlignHCenter)
 
         self.frame_16 = QFrame(self.frame_15)
         self.frame_16.setObjectName(u"frame_16")
         self.frame_16.setMinimumSize(QSize(0, 30))
-        self.frame_16.setFrameShadow(QFrame.Raised)
+        self.frame_16.setFrameShadow(QFrame.Shadow.Raised)
         self.gridLayout_19 = QGridLayout(self.frame_16)
         self.gridLayout_19.setSpacing(0)
         self.gridLayout_19.setObjectName(u"gridLayout_19")
         self.gridLayout_19.setContentsMargins(0, 0, 0, 0)
-        self.horizontalSpacer_7 = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+        self.horizontalSpacer_7 = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         self.gridLayout_19.addItem(self.horizontalSpacer_7, 1, 1, 1, 1)
 
@@ -511,14 +575,14 @@ class Ui_MainWindow(object):
 
         self.frame_17 = QFrame(self.frame_15)
         self.frame_17.setObjectName(u"frame_17")
-        sizePolicy5 = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        sizePolicy5 = QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         sizePolicy5.setHorizontalStretch(0)
         sizePolicy5.setVerticalStretch(0)
         sizePolicy5.setHeightForWidth(self.frame_17.sizePolicy().hasHeightForWidth())
         self.frame_17.setSizePolicy(sizePolicy5)
         self.frame_17.setMinimumSize(QSize(120, 120))
         self.frame_17.setMaximumSize(QSize(120, 120))
-        self.frame_17.setFrameShadow(QFrame.Raised)
+        self.frame_17.setFrameShadow(QFrame.Shadow.Raised)
         self.gridLayout_20 = QGridLayout(self.frame_17)
         self.gridLayout_20.setSpacing(0)
         self.gridLayout_20.setObjectName(u"gridLayout_20")
@@ -537,7 +601,7 @@ class Ui_MainWindow(object):
         self.gridLayout_20.addWidget(self.left_stick, 0, 0, 1, 1)
 
 
-        self.verticalLayout_5.addWidget(self.frame_17, 0, Qt.AlignHCenter|Qt.AlignVCenter)
+        self.verticalLayout_5.addWidget(self.frame_17, 0, Qt.AlignmentFlag.AlignHCenter|Qt.AlignmentFlag.AlignVCenter)
 
         self.frame_19 = QFrame(self.frame_15)
         self.frame_19.setObjectName(u"frame_19")
@@ -545,7 +609,7 @@ class Ui_MainWindow(object):
         self.frame_19.setSizePolicy(sizePolicy5)
         self.frame_19.setMinimumSize(QSize(120, 120))
         self.frame_19.setMaximumSize(QSize(120, 120))
-        self.frame_19.setFrameShadow(QFrame.Sunken)
+        self.frame_19.setFrameShadow(QFrame.Shadow.Sunken)
         self.gridLayout_21 = QGridLayout(self.frame_19)
         self.gridLayout_21.setSpacing(0)
         self.gridLayout_21.setObjectName(u"gridLayout_21")
@@ -583,16 +647,16 @@ class Ui_MainWindow(object):
         self.gridLayout_21.addWidget(self.BTN_down, 2, 1, 1, 1)
 
 
-        self.verticalLayout_5.addWidget(self.frame_19, 0, Qt.AlignHCenter|Qt.AlignVCenter)
+        self.verticalLayout_5.addWidget(self.frame_19, 0, Qt.AlignmentFlag.AlignHCenter|Qt.AlignmentFlag.AlignVCenter)
 
         self.frame_20 = QFrame(self.frame_15)
         self.frame_20.setObjectName(u"frame_20")
-        self.frame_20.setFrameShadow(QFrame.Raised)
+        self.frame_20.setFrameShadow(QFrame.Shadow.Raised)
         self.horizontalLayout_4 = QHBoxLayout(self.frame_20)
         self.horizontalLayout_4.setSpacing(0)
         self.horizontalLayout_4.setObjectName(u"horizontalLayout_4")
         self.horizontalLayout_4.setContentsMargins(0, 0, 0, 0)
-        self.horizontalSpacer_8 = QSpacerItem(97, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+        self.horizontalSpacer_8 = QSpacerItem(97, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         self.horizontalLayout_4.addItem(self.horizontalSpacer_8)
 
@@ -601,7 +665,7 @@ class Ui_MainWindow(object):
         self.BTN_capture.setMinimumSize(QSize(32, 32))
         self.BTN_capture.setMaximumSize(QSize(32, 32))
         icon1 = QIcon()
-        icon1.addFile(u"assets/Capture.png", QSize(), QIcon.Normal, QIcon.Off)
+        icon1.addFile(u"assets/Capture.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
         self.BTN_capture.setIcon(icon1)
         self.BTN_capture.setIconSize(QSize(32, 32))
         self.BTN_capture.setCheckable(True)
@@ -615,7 +679,7 @@ class Ui_MainWindow(object):
 
         self.gridLayout_18.addWidget(self.frame_15, 0, 0, 1, 1)
 
-        self.verticalSpacer_6 = QSpacerItem(20, 30, QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.verticalSpacer_6 = QSpacerItem(20, 30, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
 
         self.gridLayout_18.addItem(self.verticalSpacer_6, 1, 0, 1, 1)
 
@@ -623,7 +687,7 @@ class Ui_MainWindow(object):
         self.horizontalLayout_2.addWidget(self.joycon_l)
 
         self.dockWidget_left.setWidget(self.dockWidgetContents_2)
-        MainWindow.addDockWidget(Qt.LeftDockWidgetArea, self.dockWidget_left)
+        MainWindow.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.dockWidget_left)
         self.dockWidget_right = QDockWidget(MainWindow)
         self.dockWidget_right.setObjectName(u"dockWidget_right")
         self.dockWidgetContents_8 = QWidget()
@@ -637,18 +701,18 @@ class Ui_MainWindow(object):
         self.joycon_r.setObjectName(u"joycon_r")
         self.joycon_r.setMinimumSize(QSize(150, 0))
         self.joycon_r.setMaximumSize(QSize(150, 16777215))
-        self.joycon_r.setFrameShape(QFrame.StyledPanel)
-        self.joycon_r.setFrameShadow(QFrame.Raised)
+        self.joycon_r.setFrameShape(QFrame.Shape.StyledPanel)
+        self.joycon_r.setFrameShadow(QFrame.Shadow.Raised)
         self.gridLayout_23 = QGridLayout(self.joycon_r)
         self.gridLayout_23.setObjectName(u"gridLayout_23")
         self.frame_21 = QFrame(self.joycon_r)
         self.frame_21.setObjectName(u"frame_21")
-        self.frame_21.setFrameShadow(QFrame.Raised)
+        self.frame_21.setFrameShadow(QFrame.Shadow.Raised)
         self.verticalLayout_7 = QVBoxLayout(self.frame_21)
         self.verticalLayout_7.setSpacing(5)
         self.verticalLayout_7.setObjectName(u"verticalLayout_7")
         self.verticalLayout_7.setContentsMargins(0, 0, 0, 0)
-        self.verticalSpacer_7 = QSpacerItem(0, 35, QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.verticalSpacer_7 = QSpacerItem(0, 35, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
 
         self.verticalLayout_7.addItem(self.verticalSpacer_7)
 
@@ -662,7 +726,7 @@ class Ui_MainWindow(object):
         self.BTN_zr.setCheckable(True)
         self.BTN_zr.setFlat(True)
 
-        self.verticalLayout_7.addWidget(self.BTN_zr, 0, Qt.AlignHCenter|Qt.AlignVCenter)
+        self.verticalLayout_7.addWidget(self.BTN_zr, 0, Qt.AlignmentFlag.AlignHCenter|Qt.AlignmentFlag.AlignVCenter)
 
         self.BTN_r = QPushButton(self.frame_21)
         self.BTN_r.setObjectName(u"BTN_r")
@@ -674,17 +738,17 @@ class Ui_MainWindow(object):
         self.BTN_r.setCheckable(True)
         self.BTN_r.setFlat(False)
 
-        self.verticalLayout_7.addWidget(self.BTN_r, 0, Qt.AlignHCenter)
+        self.verticalLayout_7.addWidget(self.BTN_r, 0, Qt.AlignmentFlag.AlignHCenter)
 
         self.frame_22 = QFrame(self.frame_21)
         self.frame_22.setObjectName(u"frame_22")
         self.frame_22.setMinimumSize(QSize(0, 30))
-        self.frame_22.setFrameShadow(QFrame.Raised)
+        self.frame_22.setFrameShadow(QFrame.Shadow.Raised)
         self.gridLayout_24 = QGridLayout(self.frame_22)
         self.gridLayout_24.setSpacing(0)
         self.gridLayout_24.setObjectName(u"gridLayout_24")
         self.gridLayout_24.setContentsMargins(0, 0, 0, 0)
-        self.horizontalSpacer_9 = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+        self.horizontalSpacer_9 = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         self.gridLayout_24.addItem(self.horizontalSpacer_9, 1, 2, 1, 1)
 
@@ -765,7 +829,7 @@ class Ui_MainWindow(object):
         self.gridLayout_25.addWidget(self.BTN_b, 2, 1, 1, 1)
 
 
-        self.verticalLayout_7.addWidget(self.frame_23, 0, Qt.AlignHCenter|Qt.AlignVCenter)
+        self.verticalLayout_7.addWidget(self.frame_23, 0, Qt.AlignmentFlag.AlignHCenter|Qt.AlignmentFlag.AlignVCenter)
 
         self.frame_24 = QFrame(self.frame_21)
         self.frame_24.setObjectName(u"frame_24")
@@ -773,7 +837,7 @@ class Ui_MainWindow(object):
         self.frame_24.setSizePolicy(sizePolicy5)
         self.frame_24.setMinimumSize(QSize(120, 120))
         self.frame_24.setMaximumSize(QSize(120, 120))
-        self.frame_24.setFrameShadow(QFrame.Raised)
+        self.frame_24.setFrameShadow(QFrame.Shadow.Raised)
         self.gridLayout_26 = QGridLayout(self.frame_24)
         self.gridLayout_26.setSpacing(0)
         self.gridLayout_26.setObjectName(u"gridLayout_26")
@@ -792,11 +856,11 @@ class Ui_MainWindow(object):
         self.gridLayout_26.addWidget(self.right_stick, 0, 0, 1, 1)
 
 
-        self.verticalLayout_7.addWidget(self.frame_24, 0, Qt.AlignHCenter|Qt.AlignVCenter)
+        self.verticalLayout_7.addWidget(self.frame_24, 0, Qt.AlignmentFlag.AlignHCenter|Qt.AlignmentFlag.AlignVCenter)
 
         self.frame_26 = QFrame(self.frame_21)
         self.frame_26.setObjectName(u"frame_26")
-        self.frame_26.setFrameShadow(QFrame.Raised)
+        self.frame_26.setFrameShadow(QFrame.Shadow.Raised)
         self.horizontalLayout_5 = QHBoxLayout(self.frame_26)
         self.horizontalLayout_5.setSpacing(0)
         self.horizontalLayout_5.setObjectName(u"horizontalLayout_5")
@@ -806,7 +870,7 @@ class Ui_MainWindow(object):
         self.BTN_home.setMinimumSize(QSize(32, 32))
         self.BTN_home.setMaximumSize(QSize(32, 32))
         icon2 = QIcon()
-        icon2.addFile(u"assets/Home.png", QSize(), QIcon.Normal, QIcon.Off)
+        icon2.addFile(u"assets/Home.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
         self.BTN_home.setIcon(icon2)
         self.BTN_home.setIconSize(QSize(32, 32))
         self.BTN_home.setCheckable(True)
@@ -814,7 +878,7 @@ class Ui_MainWindow(object):
 
         self.horizontalLayout_5.addWidget(self.BTN_home)
 
-        self.horizontalSpacer_10 = QSpacerItem(97, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+        self.horizontalSpacer_10 = QSpacerItem(97, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         self.horizontalLayout_5.addItem(self.horizontalSpacer_10)
 
@@ -824,7 +888,7 @@ class Ui_MainWindow(object):
 
         self.gridLayout_23.addWidget(self.frame_21, 0, 0, 1, 1)
 
-        self.verticalSpacer_8 = QSpacerItem(20, 30, QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.verticalSpacer_8 = QSpacerItem(20, 30, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
 
         self.gridLayout_23.addItem(self.verticalSpacer_8, 1, 0, 1, 1)
 
@@ -832,7 +896,7 @@ class Ui_MainWindow(object):
         self.horizontalLayout.addWidget(self.joycon_r)
 
         self.dockWidget_right.setWidget(self.dockWidgetContents_8)
-        MainWindow.addDockWidget(Qt.RightDockWidgetArea, self.dockWidget_right)
+        MainWindow.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dockWidget_right)
         QWidget.setTabOrder(self.tabWidget, self.plainTextEdit)
         QWidget.setTabOrder(self.plainTextEdit, self.lineEditFPS)
         QWidget.setTabOrder(self.lineEditFPS, self.lineEditCameraID)
@@ -886,9 +950,10 @@ class Ui_MainWindow(object):
         self.actionPauseController.toggled.connect(MainWindow.pause_controller)
         self.actionTemplateMatchSupport.triggered.connect(MainWindow.open_template_matching_support_tool)
 
-        self.tabWidget.setCurrentIndex(0)
+        self.tabWidget.setCurrentIndex(1)
         self.pushButton_PythonReload.setDefault(False)
         self.pushButton_PythonStart.setDefault(True)
+        self.pushButton_VisualMacroStart.setDefault(True)
         self.pushButton_MCUStart.setDefault(True)
         self.pushButtonScreenShot.setDefault(False)
         self.comboBoxCameraNames.setCurrentIndex(-1)
@@ -922,19 +987,28 @@ class Ui_MainWindow(object):
         self.pushButton_PythonReload.setText(QCoreApplication.translate("MainWindow", u"Reload", None))
         self.pushButton_PythonStop.setText(QCoreApplication.translate("MainWindow", u"Stop", None))
         self.pushButton_PythonStart.setText(QCoreApplication.translate("MainWindow", u"Start", None))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab), QCoreApplication.translate("MainWindow", u"Python", None))
+        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab), QCoreApplication.translate("MainWindow", u"Py", None))
+        self.pushButton_VisualMacroReload.setText(QCoreApplication.translate("MainWindow", u"Reload", None))
+        self.toolButton_OpenVisualMacroDir.setText(QCoreApplication.translate("MainWindow", u"...", None))
+        self.pushButton_VisualMacroStop.setText(QCoreApplication.translate("MainWindow", u"Stop", None))
+        self.pushButton_VisualMacroDelete.setText(QCoreApplication.translate("MainWindow", u"Delete", None))
+        self.pushButton_VisualMacroStart.setText(QCoreApplication.translate("MainWindow", u"Start", None))
+        self.pushButton_VisualMacroDuplicate.setText(QCoreApplication.translate("MainWindow", u"Duplicate", None))
+        self.pushButton_VisualMacroOpen.setText(QCoreApplication.translate("MainWindow", u"Open Editor", None))
+        self.pushButton_VisualMacroNew.setText(QCoreApplication.translate("MainWindow", u"New", None))
+        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_3), QCoreApplication.translate("MainWindow", u"VM", None))
         self.pushButton_MCUStart.setText(QCoreApplication.translate("MainWindow", u"Start", None))
         self.toolButton_OpenMCUDir.setText(QCoreApplication.translate("MainWindow", u"...", None))
         self.pushButton_MCUStop.setText(QCoreApplication.translate("MainWindow", u"Stop", None))
         self.pushButton_MCUReload.setText(QCoreApplication.translate("MainWindow", u"Reload", None))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_2), QCoreApplication.translate("MainWindow", u"MCU", None))
+        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_2), QCoreApplication.translate("MainWindow", u"MC", None))
         self.lineEditComPort.setPlaceholderText(QCoreApplication.translate("MainWindow", u"COM Port", None))
         self.pushButtonReloadCamera.setText(QCoreApplication.translate("MainWindow", u"Reload Camera", None))
         self.pushButtonScreenShot.setText(QCoreApplication.translate("MainWindow", u"ScreenShot", None))
         self.pushButtonClearLog.setText(QCoreApplication.translate("MainWindow", u"Clear Log", None))
         self.toolButtonOpenScreenShotDir.setText(QCoreApplication.translate("MainWindow", u"...", None))
         self.pushButtonReloadPort.setText(QCoreApplication.translate("MainWindow", u"Reload Port", None))
-        self.pushButtonReloadPort.setProperty("class", QCoreApplication.translate("MainWindow", u"h1_subtitle", None))
+        self.pushButtonReloadPort.setProperty(u"class", QCoreApplication.translate("MainWindow", u"h1_subtitle", None))
         self.lineEditCameraID.setPlaceholderText(QCoreApplication.translate("MainWindow", u"Camera ID", None))
         self.lineEditFPS.setPlaceholderText(QCoreApplication.translate("MainWindow", u"FPS", None))
         self.label.setText(QCoreApplication.translate("MainWindow", u"Set: ", None))

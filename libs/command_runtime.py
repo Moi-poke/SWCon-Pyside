@@ -6,6 +6,7 @@ from typing import Optional, Type
 
 import numpy as np
 from PySide6.QtCore import QObject, QThread, Qt, Signal, Slot
+
 from libs.frame_store import FrameStore
 
 
@@ -34,6 +35,10 @@ class CommandThread(QThread):
     recognize_rect = Signal(tuple, tuple, object, int)
     command_finished = Signal(bool)
 
+    # H-1: 実行中ブロック可視化用の signal
+    highlight_block_requested = Signal(str)
+    clear_block_highlight_requested = Signal()
+
     def __init__(
         self,
         command_cls: Type[QObject],
@@ -59,6 +64,19 @@ class CommandThread(QThread):
         worker.recognize_rect.connect(self.recognize_rect)
         worker.stop_function.connect(self.command_finished)
 
+        # H-1: VisualMacroRuntime が highlight signal を持っていれば relay
+        if hasattr(worker, "highlight_block_requested"):
+            worker.highlight_block_requested.connect(
+                self.highlight_block_requested,
+                Qt.ConnectionType.QueuedConnection,
+            )
+
+        if hasattr(worker, "clear_block_highlight_requested"):
+            worker.clear_block_highlight_requested.connect(
+                self.clear_block_highlight_requested,
+                Qt.ConnectionType.QueuedConnection,
+            )
+
         try:
             if hasattr(worker, "__post_init__"):
                 worker.__post_init__()
@@ -72,6 +90,10 @@ class CommandRuntime(QObject):
     log = Signal(str, int)
     started = Signal(str)
     stopped = Signal(bool)
+
+    # H-1: MainWindow へ中継する signal
+    highlight_block_requested = Signal(str)
+    clear_block_highlight_requested = Signal()
 
     def __init__(
         self, frame_store: FrameStore, parent: Optional[QObject] = None
@@ -108,6 +130,16 @@ class CommandRuntime(QObject):
         )
         self._thread.finished.connect(
             self._on_thread_finished, Qt.ConnectionType.QueuedConnection
+        )
+
+        # H-1: thread -> runtime relay
+        self._thread.highlight_block_requested.connect(
+            self.highlight_block_requested,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        self._thread.clear_block_highlight_requested.connect(
+            self.clear_block_highlight_requested,
+            Qt.ConnectionType.QueuedConnection,
         )
 
         self._thread.start()
