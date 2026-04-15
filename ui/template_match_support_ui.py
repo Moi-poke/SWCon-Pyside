@@ -3,7 +3,7 @@
 ################################################################################
 ## Form generated from reading UI file 'template_match_support.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.3.1
+## Created by: Qt User Interface Compiler version 6.11.0
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -29,7 +29,7 @@ class Ui_Form(object):
             Form.setObjectName(u"Form")
         Form.setWindowModality(Qt.NonModal)
         Form.resize(800, 600)
-        sizePolicy = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        sizePolicy = QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(Form.sizePolicy().hasHeightForWidth())
@@ -100,7 +100,7 @@ class Ui_Form(object):
         self.horizontalLayout_4.setSpacing(0)
         self.horizontalLayout_4.setObjectName(u"horizontalLayout_4")
         self.horizontalLayout_4.setContentsMargins(0, 0, 0, 0)
-        self.horizontalSpacer_4 = QSpacerItem(20, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+        self.horizontalSpacer_4 = QSpacerItem(20, 20, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
 
         self.horizontalLayout_4.addItem(self.horizontalSpacer_4)
 
@@ -122,7 +122,7 @@ class Ui_Form(object):
         self.horizontalLayout_2.setSpacing(0)
         self.horizontalLayout_2.setObjectName(u"horizontalLayout_2")
         self.horizontalLayout_2.setContentsMargins(0, 0, 0, 0)
-        self.horizontalSpacer_2 = QSpacerItem(20, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+        self.horizontalSpacer_2 = QSpacerItem(20, 20, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
 
         self.horizontalLayout_2.addItem(self.horizontalSpacer_2)
 
@@ -131,7 +131,7 @@ class Ui_Form(object):
         self.spinBoxThreshold.setEnabled(False)
         self.spinBoxThreshold.setAlignment(Qt.AlignCenter)
         self.spinBoxThreshold.setButtonSymbols(QAbstractSpinBox.UpDownArrows)
-        self.spinBoxThreshold.setProperty("showGroupSeparator", False)
+        self.spinBoxThreshold.setProperty(u"showGroupSeparator", False)
         self.spinBoxThreshold.setMaximum(255)
         self.spinBoxThreshold.setValue(128)
 
@@ -148,7 +148,7 @@ class Ui_Form(object):
         self.horizontalLayout_3.setSpacing(0)
         self.horizontalLayout_3.setObjectName(u"horizontalLayout_3")
         self.horizontalLayout_3.setContentsMargins(0, 0, 0, 0)
-        self.horizontalSpacer_3 = QSpacerItem(20, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+        self.horizontalSpacer_3 = QSpacerItem(20, 20, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
 
         self.horizontalLayout_3.addItem(self.horizontalSpacer_3)
 
@@ -173,7 +173,7 @@ class Ui_Form(object):
 
         self.verticalLayout_3.addWidget(self.frame_5)
 
-        self.verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        self.verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
 
         self.verticalLayout_3.addItem(self.verticalSpacer)
 
@@ -211,7 +211,7 @@ class Ui_Form(object):
         self.graphicsView.setObjectName(u"graphicsView")
         self.graphicsView.setMinimumSize(QSize(640, 36))
         self.graphicsView.setMaximumSize(QSize(640, 360))
-        self.graphicsView.viewport().setProperty("cursor", QCursor(Qt.CrossCursor))
+        self.graphicsView.viewport().setProperty(u"cursor", QCursor(Qt.CursorShape.CrossCursor))
         self.graphicsView.setFrameShape(QFrame.NoFrame)
         self.graphicsView.setFrameShadow(QFrame.Plain)
         self.graphicsView.setLineWidth(0)
@@ -271,8 +271,8 @@ class Ui_Form(object):
 
         self.line = QFrame(self.frame_4)
         self.line.setObjectName(u"line")
-        self.line.setFrameShape(QFrame.VLine)
-        self.line.setFrameShadow(QFrame.Sunken)
+        self.line.setFrameShape(QFrame.Shape.VLine)
+        self.line.setFrameShadow(QFrame.Shadow.Sunken)
 
         self.horizontalLayout.addWidget(self.line)
 
@@ -290,7 +290,7 @@ class Ui_Form(object):
 
         self.labelCoordinate = QLabel(self.frame_4)
         self.labelCoordinate.setObjectName(u"labelCoordinate")
-        sizePolicy1 = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        sizePolicy1 = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         sizePolicy1.setHorizontalStretch(0)
         sizePolicy1.setVerticalStretch(0)
         sizePolicy1.setHeightForWidth(self.labelCoordinate.sizePolicy().hasHeightForWidth())
@@ -315,7 +315,7 @@ class Ui_Form(object):
 
         self.horizontalLayout.addWidget(self.lineEditMatchNum)
 
-        self.horizontalSpacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+        self.horizontalSpacer = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         self.horizontalLayout.addItem(self.horizontalSpacer)
 

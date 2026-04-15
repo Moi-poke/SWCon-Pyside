@@ -1,0 +1,162 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: "Segoe UI", "Yu Gothic UI", sans-serif;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #d0d7de;
+  background: #f6f8fa;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-actions {
+  flex-wrap: wrap;
+}
+
+.main-layout {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.side-panel {
+  width: 320px;
+  min-width: 320px;
+  border-right: 1px solid #d0d7de;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.panel-section h2 {
+  font-size: 14px;
+  margin: 0;
+}
+
+#template-select {
+  width: 100%;
+  min-height: 180px;
+}
+
+#program-json-output {
+  width: 100%;
+  min-height: 240px;
+  flex: 1;
+  resize: none;
+  font-family: "Consolas", "Menlo", monospace;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.editor-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+#blockly-div {
+  width: 100%;
+  height: 100%;
+}
+
+
+#recent-files-select {
+  width: 240px;
+  min-width: 240px;
+  max-width: 240px;
+  flex: 0 0 240px;
+}
+.recent-files-dropdown {
+  position: relative;
+  width: 240px;
+  min-width: 240px;
+  max-width: 240px;
+}
+
+#recent-files-button {
+  width: 100%;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-files-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 240px;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid #d0d7de;
+  background: #ffffff;
+  z-index: 1000;
+  box-sizing: border-box;
+}
+
+.recent-files-item {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  text-align: left;
+  background: #ffffff;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-files-item:hover {
+  background: #f6f8fa;
+}
+
+
+.status-bar {
+  padding: 6px 12px;
+  border-top: 1px solid #d0d7de;
+  background: #f6f8fa;
+  font-size: 12px;
+}
+
+input[type="text"] {
+  width: 220px;
+  padding: 4px 6px;
+}
+
+button {
+  padding: 4px 10px;
+  cursor: pointer;
+}
