@@ -52,7 +52,7 @@ from libs.visual_macro.repository import VisualMacroRepository
 from ui.main_ui import Ui_MainWindow
 from ui.QtextLogger import QPlainTextEditLogger
 
-VERSION = "0.9.0 (beta)"
+VERSION = "0.9.1 (beta)"
 Author = "Moi"
 
 
