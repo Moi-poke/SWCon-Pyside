@@ -6,38 +6,295 @@
       "name": "操作",
       "categorystyle": "logic_category",
       "contents": [
-        { "kind": "block", "type": "vm_press" },
-        { "kind": "block", "type": "vm_press_many" },
-        { "kind": "block", "type": "vm_mash" },
-        { "kind": "block", "type": "vm_hold" },
-        { "kind": "block", "type": "vm_hold_end" },
-        { "kind": "block", "type": "vm_stick_move" },
-        { "kind": "block", "type": "vm_stick_hold" },
-        { "kind": "block", "type": "vm_stick_release" },
-        { "kind": "block", "type": "vm_wait" },
-        { "kind": "block", "type": "vm_print" },
-        { "kind": "block", "type": "vm_finish" }
+        {
+          "kind": "block",
+          "type": "vm_press"
+        },
+        {
+          "kind": "block",
+          "type": "vm_press_many"
+        },
+        {
+          "kind": "block",
+          "type": "vm_mash"
+        },
+        {
+          "kind": "block",
+          "type": "vm_hold"
+        },
+        {
+          "kind": "block",
+          "type": "vm_hold_end"
+        },
+        {
+          "kind": "block",
+          "type": "vm_stick_move"
+        },
+        {
+          "kind": "block",
+          "type": "vm_stick_hold"
+        },
+        {
+          "kind": "block",
+          "type": "vm_stick_release"
+        },
+        {
+          "kind": "block",
+          "type": "vm_wait"
+        },
+        {
+          "kind": "block",
+          "type": "vm_print"
+        },
+        {
+          "kind": "block",
+          "type": "vm_print_value"
+        },
+        {
+          "kind": "block",
+          "type": "vm_comment"
+        },
+        {
+          "kind": "block",
+          "type": "vm_finish"
+        }
       ]
     },
     {
-  "kind": "category",
-  "name": "制御",
-  "categorystyle": "loop_category",
-  "contents": [
-    { "kind": "block", "type": "vm_if" },
-    { "kind": "block", "type": "vm_repeat" },
-    { "kind": "block", "type": "vm_while_alive" }
-  ]
-},
-{
-  "kind": "category",
-  "name": "条件",
-  "categorystyle": "procedure_category",
-  "contents": [
-    { "kind": "block", "type": "vm_image_exists" },
-    { "kind": "block", "type": "vm_wait_until_image" },
-    { "kind": "block", "type": "vm_wait_until_not_image" }
-  ]
-}
+      "kind": "category",
+      "name": "制御",
+      "categorystyle": "loop_category",
+      "contents": [
+        {
+          "kind": "block",
+          "type": "vm_if"
+        },
+        {
+          "kind": "block",
+          "type": "vm_repeat"
+        },
+        {
+          "kind": "block",
+          "type": "vm_while_alive"
+        },
+        {
+          "kind": "block",
+          "type": "vm_while_condition"
+        },
+        {
+          "kind": "block",
+          "type": "vm_for_range"
+        },
+        {
+          "kind": "block",
+          "type": "vm_list_for_each"
+        },
+        {
+          "kind": "block",
+          "type": "vm_break"
+        },
+        {
+          "kind": "block",
+          "type": "vm_continue"
+        },
+        {
+          "kind": "block",
+          "type": "vm_while_image_exists"
+        },
+        {
+          "kind": "block",
+          "type": "vm_while_not_image_exists"
+        }
+      ]
+    },
+    {
+      "kind": "category",
+      "name": "条件",
+      "categorystyle": "procedure_category",
+      "contents": [
+        {
+          "kind": "block",
+          "type": "vm_image_exists"
+        },
+        {
+          "kind": "block",
+          "type": "vm_wait_until_image"
+        },
+        {
+          "kind": "block",
+          "type": "vm_wait_until_not_image"
+        }
+      ]
+    },
+    {
+      "kind": "category",
+      "name": "変数",
+      "categorystyle": "variable_category",
+      "contents": [
+        {
+          "kind": "block",
+          "type": "vm_set_variable"
+        },
+        {
+          "kind": "block",
+          "type": "vm_get_variable"
+        },
+        {
+          "kind": "block",
+          "type": "vm_change_variable"
+        }
+      ]
+    },
+    {
+      "kind": "category",
+      "name": "論理",
+      "categorystyle": "logic_category",
+      "contents": [
+        {
+          "kind": "block",
+          "type": "vm_compare"
+        },
+        {
+          "kind": "block",
+          "type": "vm_logic_operation"
+        },
+        {
+          "kind": "block",
+          "type": "vm_logic_not"
+        },
+        {
+          "kind": "block",
+          "type": "vm_boolean"
+        },
+        {
+          "kind": "block",
+          "type": "vm_ternary"
+        }
+      ]
+    },
+    {
+      "kind": "category",
+      "name": "数値",
+      "categorystyle": "math_category",
+      "contents": [
+        {
+          "kind": "block",
+          "type": "vm_number"
+        },
+        {
+          "kind": "block",
+          "type": "vm_arithmetic"
+        },
+        {
+          "kind": "block",
+          "type": "vm_random_int"
+        },
+        {
+          "kind": "block",
+          "type": "vm_random_float"
+        },
+        {
+          "kind": "block",
+          "type": "vm_math_single"
+        },
+        {
+          "kind": "block",
+          "type": "vm_math_minmax"
+        },
+        {
+          "kind": "block",
+          "type": "vm_to_number"
+        }
+      ]
+    },
+    {
+      "kind": "category",
+      "name": "テキスト",
+      "categorystyle": "text_category",
+      "contents": [
+        {
+          "kind": "block",
+          "type": "vm_text"
+        },
+        {
+          "kind": "block",
+          "type": "vm_text_join"
+        },
+        {
+          "kind": "block",
+          "type": "vm_to_text"
+        },
+        {
+          "kind": "block",
+          "type": "vm_text_length"
+        },
+        {
+          "kind": "block",
+          "type": "vm_text_contains"
+        },
+        {
+          "kind": "block",
+          "type": "vm_text_substring"
+        }
+      ]
+    },
+    {
+      "kind": "category",
+      "name": "リスト",
+      "categorystyle": "list_category",
+      "contents": [
+        {
+          "kind": "block",
+          "type": "vm_list_create_empty"
+        },
+        {
+          "kind": "block",
+          "type": "vm_list_create_with"
+        },
+        {
+          "kind": "block",
+          "type": "vm_list_length"
+        },
+        {
+          "kind": "block",
+          "type": "vm_list_get"
+        },
+        {
+          "kind": "block",
+          "type": "vm_list_set"
+        },
+        {
+          "kind": "block",
+          "type": "vm_list_append"
+        }
+      ]
+    },
+    {
+      "kind": "category",
+      "name": "関数",
+      "categorystyle": "procedure_category",
+      "contents": [
+        {
+          "kind": "block",
+          "type": "vm_define_function"
+        },
+        {
+          "kind": "block",
+          "type": "vm_call_function"
+        },
+        {
+          "kind": "block",
+          "type": "vm_call_function_value"
+        },
+        {
+          "kind": "block",
+          "type": "vm_return"
+        },
+        {
+          "kind": "block",
+          "type": "vm_function_param"
+        }
+      ]
+    }
   ]
 }

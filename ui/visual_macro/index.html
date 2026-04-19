@@ -8,7 +8,15 @@
   <link rel="stylesheet" href="styles.css" />
   <script src="https://unpkg.com/blockly/blockly.min.js"></script>
   <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
-</head>
+
+    <style>
+      .roi-coord-inputs { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+      .roi-coord-inputs label { font-size: 12px; display: flex; align-items: center; gap: 2px; color: #ccc; }
+      .roi-coord-inputs input { width: 60px; font-size: 12px; padding: 2px 4px;
+        background: #2a2a2a; color: #eee; border: 1px solid #555; border-radius: 3px; }
+      .roi-coord-inputs input:focus { border-color: #4a9eff; outline: none; }
+    </style>
+  </head>
 <body>
   <div class="app-shell">
     <header class="toolbar">
@@ -39,6 +47,14 @@
           <h2>テンプレート</h2>
           <button id="refresh-templates-button" type="button">一覧更新</button>
           <select id="template-select" size="10"></select>
+        </section>
+        <section class="panel-section">
+          <h2>テンプレートプレビュー</h2>
+          <div id="template-preview-container">
+            <div class="preview-placeholder" id="template-preview-placeholder">画像ブロックを選択するとプレビューが表示されます</div>
+            <img id="template-preview-img" hidden />
+          </div>
+          <button id="roi-select-btn" type="button" disabled>ROI選択...</button>
         </section>
 
         <section class="panel-section">
@@ -72,5 +88,35 @@
 
   <script type="module" src="blocks.js"></script>
   <script type="module" src="app.js"></script>
-</body>
+
+    <div id="roi-modal" class="modal-overlay" hidden>
+      <div class="modal-content roi-modal-content">
+        <div class="roi-header">
+          <h2>ROI選択</h2>
+          <span id="roi-info-text">画像を読み込んでください</span>
+        </div>
+        <div class="roi-toolbar">
+          <button id="roi-capture-btn" type="button">📷 現在のキャプチャ</button>
+          <button id="roi-load-file-btn" type="button">📁 画像ファイル...</button>
+          <input id="roi-file-input" type="file" accept="image/*" hidden />
+          <span id="roi-coords-display"></span>
+              <div class="roi-coord-inputs" id="roi-coord-inputs">
+                <label>X1:<input id="roi-input-x1" type="number" min="0" step="1" value="0"></label>
+                <label>Y1:<input id="roi-input-y1" type="number" min="0" step="1" value="0"></label>
+                <label>X2:<input id="roi-input-x2" type="number" min="0" step="1" value="0"></label>
+                <label>Y2:<input id="roi-input-y2" type="number" min="0" step="1" value="0"></label>
+              </div>
+        </div>
+        <div class="roi-canvas-wrapper" id="roi-canvas-wrapper">
+          <canvas id="roi-canvas"></canvas>
+        </div>
+        <div class="roi-actions">
+          <button id="roi-apply-btn" type="button" disabled>✅ 適用</button>
+          <button id="roi-reset-btn" type="button">🔄 リセット</button>
+          <button id="roi-cancel-btn" type="button">❌ キャンセル</button>
+        </div>
+      </div>
+    </div>
+    
+  </body>
 </html>

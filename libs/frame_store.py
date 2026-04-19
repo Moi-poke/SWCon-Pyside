@@ -31,6 +31,13 @@ class FrameStore:
                 return None, last_seq
             return self._preview, self._preview_seq
 
+    def latest_preview_copy(self) -> Optional[QImage]:
+        """Return a copy of the latest preview QImage, or None."""
+        with self._lock:
+            if self._preview is None:
+                return None
+            return self._preview.copy()
+
     # ------------------------------
     # raw(np.ndarray) for command
     # ------------------------------

@@ -160,3 +160,91 @@ button {
   padding: 4px 10px;
   cursor: pointer;
 }
+/* ── ROI Modal ── */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay[hidden] {
+  display: none !important;
+}
+.modal-content {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 16px;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.roi-modal-content {
+  width: 80vw;
+  height: 80vh;
+}
+
+.roi-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.roi-header h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+#roi-info-text {
+  font-size: 12px;
+  color: #666;
+}
+
+.roi-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+#roi-coords-display {
+  font-size: 12px;
+  color: #333;
+  font-family: "Consolas", "Menlo", monospace;
+  margin-left: auto;
+}
+
+.roi-canvas-wrapper {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #d0d7de;
+  background: #f0f0f0;
+  position: relative;
+  cursor: crosshair;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#roi-canvas {
+  display: block;
+}
+
+.roi-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+#roi-select-btn {
+  width: 100%;
+  margin-top: 4px;
+}

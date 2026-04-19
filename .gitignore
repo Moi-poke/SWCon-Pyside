@@ -1,6 +1,7 @@
 /.qt_for_python/uic/
 /.idea/
 *.pyc
-config/settings.toml
 ScreenShot/*
 /no_git/
+config/settings.toml
+Commands/Visual/*.json
