@@ -207,6 +207,34 @@ class CommandBase(QObject):
                 return None
             return self._latest_frame.copy()
 
+    def get_slot_frame(self, slot_id: int) -> Optional[np.ndarray]:
+        """他スロットのキャプチャフレームを取得する.
+
+        Args:
+            slot_id: 参照先のスロットID (0~3)
+
+        Returns:
+            フレーム画像 (BGR numpy 配列) or None
+
+        Usage::
+
+            other = self.get_slot_frame(1)  # Slot 1 のキャプチャ
+            if other is not None:
+                # テンプレートマッチングなど
+                ...
+        """
+        if self._runtime_context is not None:
+            return self._runtime_context.get_slot_frame(slot_id)
+        return None
+
+    @property
+    def slot_id(self) -> int:
+        """自分が実行されているスロットの ID を返す."""
+        if self._runtime_context is not None:
+            return self._runtime_context.slot_id
+        return 0
+
+
     def matching_image_in_the_template_listing(
         self,
         template_path_list: list[str],

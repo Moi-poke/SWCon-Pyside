@@ -44,6 +44,7 @@ from libs.keys import KeyPress
 from libs.mcu_command_base import McuCommand
 from libs.serial_worker import SerialWorker
 from libs.settings import Setting
+from libs.slot_manager import SlotManager
 from libs.template_match_support import TemplateMatchSupport
 from libs.Utility import ospath
 from libs.visual_macro.editor_widget import VisualMacroEditorWidget
@@ -100,6 +101,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.command_runtime: Optional[CommandRuntime] = None
         self.command_session: Optional[CommandSessionController] = None
+        self.slot_manager: Optional[SlotManager] = None
         self.command_catalog: Optional[CommandCatalog] = None
 
         self.current_python_descriptor: Optional[CommandDescriptor] = None
@@ -149,10 +151,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             raise RuntimeError("Settings are not loaded")
         self.setup_functions_connect()
 
-        self.connect_capture()
-        self.connect_serial()
+        self.connect_slot_manager()
         self.connect_gamepad()
-        self.connect_command_runtime()
         self.setup_visual_macro_editor()
 
         self.load_commands()
@@ -265,106 +265,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     # worker wiring
     # ------------------------------------------------------------------
 
-    def connect_capture(self) -> None:
-        self.capture_thread = QThread(self)
-        try:
-            camera_id = int(self.lineEditCameraID.text())
-        except Exception:
-            camera_id = -1
-
-        self.capture_worker = CaptureWorker(
-            camera_id=camera_id,
-            frame_store=self.frame_store,
-        )
-        self.capture_worker.moveToThread(self.capture_thread)
-
-        self.capture_thread.started.connect(self.capture_worker.start_capture)
-        self.capture_thread.finished.connect(self.capture_worker.deleteLater)
-
-        self.capture_worker.log.connect(
-            self.callback_string_to_log,
-            type=Qt.ConnectionType.QueuedConnection,
-        )
-
-        self.request_capture_reopen.connect(
-            self.capture_worker.reopen_camera,
-            type=Qt.ConnectionType.QueuedConnection,
-        )
-        self.request_capture_set_fps.connect(
-            self.capture_worker.set_fps,
-            type=Qt.ConnectionType.QueuedConnection,
-        )
-        self.request_capture_save.connect(
-            self.capture_worker.save_capture,
-            type=Qt.ConnectionType.QueuedConnection,
-        )
-        self.request_capture_add_rect.connect(
-            self.capture_worker.add_rect,
-            type=Qt.ConnectionType.QueuedConnection,
-        )
-        self.request_capture_stop.connect(
-            self.capture_worker.stop_capture,
-            type=Qt.ConnectionType.QueuedConnection,
-        )
-        self.request_capture_frame_stream.connect(
-            self.capture_worker.set_frame_stream_enabled,
-            type=Qt.ConnectionType.QueuedConnection,
-        )
-
-        self.capture_thread.start()
-
-    def connect_serial(self) -> None:
-        self.serial_thread = QThread(self)
-        self.serial_worker = SerialWorker(
-            is_show_serial=self.is_show_serial,
-            keypress_factory=KeyPress,
-            gui_stick_store=self.gui_stick_store,
-        )
-
-        self.serial_worker.moveToThread(self.serial_thread)
-
-        self.serial_thread.started.connect(self.serial_worker.start)
-        self.serial_thread.finished.connect(self.serial_worker.deleteLater)
-
-        self.request_serial_open.connect(
-            self.serial_worker.open_port, Qt.ConnectionType.QueuedConnection
-        )
-        self.request_serial_close.connect(
-            self.serial_worker.close_port, Qt.ConnectionType.QueuedConnection
-        )
-        self.request_serial_write.connect(
-            self.serial_worker.write_row, Qt.ConnectionType.QueuedConnection
-        )
-        self.request_serial_keypress.connect(
-            self.serial_worker.on_keypress, Qt.ConnectionType.QueuedConnection
-        )
-        self.request_serial_button_pressed.connect(
-            self.serial_worker.on_named_button_pressed,
-            Qt.ConnectionType.QueuedConnection,
-        )
-        self.request_serial_button_released.connect(
-            self.serial_worker.on_named_button_released,
-            Qt.ConnectionType.QueuedConnection,
-        )
-        self.request_serial_axis.connect(
-            self.serial_worker.on_axis_moved, Qt.ConnectionType.QueuedConnection
-        )
-        self.request_serial_show.connect(
-            self.serial_worker.set_show_serial, Qt.ConnectionType.QueuedConnection
-        )
-
-        self.serial_worker.log.connect(
-            self.callback_string_to_log, Qt.ConnectionType.QueuedConnection
-        )
-        self.serial_worker.serial_error.connect(
-            self.on_serial_error, Qt.ConnectionType.QueuedConnection
-        )
-        self.serial_worker.serial_state_changed.connect(
-            self.on_serial_state_changed, Qt.ConnectionType.QueuedConnection
-        )
-
-        self.serial_thread.start()
-
     def connect_gamepad(self) -> None:
         self.gamepad_thread = QThread(self)
         self.gamepad_worker = GamepadController()
@@ -414,41 +314,134 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.gamepad_l_stick()
         self.gamepad_r_stick()
 
-    def connect_command_runtime(self) -> None:
-        self.command_runtime = CommandRuntime(self.frame_store, self)
-        self.command_runtime.log.connect(
+    def connect_slot_manager(self) -> None:
+        """SlotManager を生成し、全スロットを起動する."""
+        from libs.slot_manager import SlotManager
+
+        # ---- SlotManager 生成 ----
+        self.slot_manager = SlotManager(self)
+        configs = self.setting.get_slot_configs()
+        self.slot_manager.create_slots(configs)
+
+        # ---- SessionController 構築 (各スロット) ----
+        def _session_ctrl_kwargs(slot):
+            return dict(
+                logger=self.logger,
+                pause_gamepad=lambda paused: self.request_gamepad_pause.emit(paused),
+                set_frame_stream=lambda on: (
+                    slot.capture_worker.set_frame_stream_enabled(on)
+                ),
+                sync_buttons=lambda: self._sync_command_buttons(),
+                play_mcu_callback=self.play_mcu,
+            )
+
+        self.slot_manager.build_all_session_controllers(_session_ctrl_kwargs)
+
+        # ---- スロット起動 ----
+        self.slot_manager.start_all()
+
+        # ---- アクティブスロットの後方互換参照 ----
+        active = self.slot_manager.active_slot
+        if active is None:
+            self.logger.error("No active slot available")
+            return
+
+        self.frame_store = active.frame_store
+        self.capture_worker = active.capture_worker
+        self.capture_thread = active.capture_thread
+        self.serial_worker = active.serial_worker
+        self.serial_thread = active.serial_thread
+        self.command_runtime = active.command_runtime
+        self.command_session = active.command_session
+        self.gui_stick_store = active.gui_stick_store
+
+        # ---- capture worker 接続 ----
+        self.capture_worker.log.connect(
             self.callback_string_to_log,
             type=Qt.ConnectionType.QueuedConnection,
         )
-        self.command_runtime.started.connect(
-            self.on_command_started,
+        self.request_capture_reopen.connect(
+            self.capture_worker.reopen_camera,
             type=Qt.ConnectionType.QueuedConnection,
         )
-        self.command_runtime.stopped.connect(
-            self.on_command_stopped,
+        self.request_capture_set_fps.connect(
+            self.capture_worker.set_fps,
             type=Qt.ConnectionType.QueuedConnection,
         )
-        self.command_runtime.highlight_block_requested.connect(
-            self.on_visual_macro_highlight_requested,
+        self.request_capture_save.connect(
+            self.capture_worker.save_capture,
             type=Qt.ConnectionType.QueuedConnection,
         )
-        self.command_runtime.clear_block_highlight_requested.connect(
-            self.on_visual_macro_highlight_cleared,
+        self.request_capture_add_rect.connect(
+            self.capture_worker.add_rect,
+            type=Qt.ConnectionType.QueuedConnection,
+        )
+        self.request_capture_stop.connect(
+            self.capture_worker.stop_capture,
+            type=Qt.ConnectionType.QueuedConnection,
+        )
+        self.request_capture_frame_stream.connect(
+            self.capture_worker.set_frame_stream_enabled,
             type=Qt.ConnectionType.QueuedConnection,
         )
 
-        self.command_session = CommandSessionController(
-            logger=self.logger,
-            command_runtime=self.command_runtime,
-            serial_worker=self.serial_worker,
-            capture_worker=self.capture_worker,
-            pause_gamepad=lambda paused: self.request_gamepad_pause.emit(paused),
-            set_frame_stream=lambda enabled: self.request_capture_frame_stream.emit(
-                enabled
-            ),
-            sync_buttons=self._sync_command_buttons,
-            play_mcu_callback=self.play_mcu,
+        # ---- serial worker 接続 ----
+        self.request_serial_open.connect(
+            self.serial_worker.open_port, Qt.ConnectionType.QueuedConnection
         )
+        self.request_serial_close.connect(
+            self.serial_worker.close_port, Qt.ConnectionType.QueuedConnection
+        )
+        self.request_serial_write.connect(
+            self.serial_worker.write_row, Qt.ConnectionType.QueuedConnection
+        )
+        self.request_serial_keypress.connect(
+            self.serial_worker.on_keypress, Qt.ConnectionType.QueuedConnection
+        )
+        self.request_serial_button_pressed.connect(
+            self.serial_worker.on_named_button_pressed,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        self.request_serial_button_released.connect(
+            self.serial_worker.on_named_button_released,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        self.request_serial_axis.connect(
+            self.serial_worker.on_axis_moved, Qt.ConnectionType.QueuedConnection
+        )
+        self.request_serial_show.connect(
+            self.serial_worker.set_show_serial, Qt.ConnectionType.QueuedConnection
+        )
+        self.serial_worker.log.connect(
+            self.callback_string_to_log, Qt.ConnectionType.QueuedConnection
+        )
+        self.serial_worker.serial_error.connect(
+            self.on_serial_error, Qt.ConnectionType.QueuedConnection
+        )
+        self.serial_worker.serial_state_changed.connect(
+            self.on_serial_state_changed, Qt.ConnectionType.QueuedConnection
+        )
+
+        # ---- command runtime 接続 ----
+        self.command_runtime.log.connect(
+            self.callback_string_to_log, Qt.ConnectionType.QueuedConnection
+        )
+        self.command_runtime.started.connect(
+            self.on_command_started, Qt.ConnectionType.QueuedConnection
+        )
+        self.command_runtime.stopped.connect(
+            self.on_command_stopped, Qt.ConnectionType.QueuedConnection
+        )
+        if hasattr(self.command_runtime, "highlight_block_requested"):
+            self.command_runtime.highlight_block_requested.connect(
+                self.on_visual_macro_highlight_requested,
+                Qt.ConnectionType.QueuedConnection,
+            )
+        if hasattr(self.command_runtime, "clear_block_highlight_requested"):
+            self.command_runtime.clear_block_highlight_requested.connect(
+                self.on_visual_macro_highlight_cleared,
+                Qt.ConnectionType.QueuedConnection,
+            )
 
     @Slot()
     def render_latest_preview(self) -> None:
@@ -2018,32 +2011,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # 2. command stop
         self.stop_command(block=True)
-        self.request_capture_frame_stream.emit(False)
 
         # 3. gamepad stop
         self.request_gamepad_pause.emit(True)
         self.request_gamepad_stop.emit()
 
-        # 4. capture stop
-        self.request_capture_stop.emit()
+        # 4-6. slot manager handles capture + serial stop + thread cleanup
+        if self.slot_manager is not None:
+            self.slot_manager.shutdown_all()
 
-        # 5. line worker は omit のためなし
-
-        # 6. serial close
-        self.request_serial_close.emit()
-
-        # 7. thread quit/wait
+        # 7. gamepad thread quit/wait
         if self.gamepad_thread is not None:
             self.gamepad_thread.quit()
             self.gamepad_thread.wait(3000)
-
-        if self.capture_thread is not None:
-            self.capture_thread.quit()
-            self.capture_thread.wait(3000)
-
-        if self.serial_thread is not None:
-            self.serial_thread.quit()
-            self.serial_thread.wait(3000)
 
         # 8. Visual Macro dock 状態保存
         self._save_visual_macro_dock_state()

@@ -2,18 +2,28 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Optional, Type
+from typing import TYPE_CHECKING, Optional, Type
 
 import numpy as np
 from PySide6.QtCore import QObject, QThread, Qt, Signal, Slot
 
 from libs.frame_store import FrameStore
 
+if TYPE_CHECKING:
+    from libs.frame_store_registry import FrameStoreRegistry
+
 
 class CommandContext:
-    def __init__(self, frame_store: FrameStore) -> None:
+    def __init__(
+        self,
+        frame_store: FrameStore,
+        frame_registry: "FrameStoreRegistry" = None,
+        slot_id: int = 0,
+    ) -> None:
         self._frame_store = frame_store
         self._stop_event = threading.Event()
+        self._frame_registry = frame_registry
+        self._slot_id = slot_id
 
     def latest_frame_copy(self) -> Optional[np.ndarray]:
         return self._frame_store.latest_raw_copy()
@@ -26,6 +36,24 @@ class CommandContext:
 
     def is_stop_requested(self) -> bool:
         return self._stop_event.is_set()
+
+    @property
+    def slot_id(self) -> int:
+        """自分が実行されているスロットの ID."""
+        return self._slot_id
+
+    def get_slot_frame(self, slot_id: int) -> Optional[np.ndarray]:
+        """他スロットのフレームを取得する.
+
+        Args:
+            slot_id: 参照先のスロットID (0~3)
+
+        Returns:
+            BGR numpy 配列、存在しない場合は None
+        """
+        if self._frame_registry is None:
+            return None
+        return self._frame_registry.get_raw_frame(slot_id)
 
 
 class CommandThread(QThread):
@@ -96,10 +124,14 @@ class CommandRuntime(QObject):
     clear_block_highlight_requested = Signal()
 
     def __init__(
-        self, frame_store: FrameStore, parent: Optional[QObject] = None
+        self,
+        frame_store: FrameStore,
+        frame_registry: "FrameStoreRegistry" = None,
+        slot_id: int = 0,
+        parent: Optional[QObject] = None,
     ) -> None:
         super().__init__(parent)
-        self._context = CommandContext(frame_store)
+        self._context = CommandContext(frame_store, frame_registry=frame_registry, slot_id=slot_id)
         self._thread: Optional[CommandThread] = None
         self._pending_result: Optional[bool] = None
 
