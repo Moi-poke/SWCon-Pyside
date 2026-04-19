@@ -1,4 +1,5 @@
 """SessionSlot - 1台の Switch 操作に必要なリソースを束ねるスロット."""
+
 from __future__ import annotations
 
 import logging
@@ -81,6 +82,7 @@ class SessionSlot(QObject):
 
         # ---- state ----
         self._serial_open: bool = False
+        self._started: bool = False  # ★ NEW
 
         # ---- signal wiring ----
         self._wire_signals()
@@ -105,6 +107,10 @@ class SessionSlot(QObject):
     def is_serial_open(self) -> bool:
         return self._serial_open
 
+    @property
+    def is_started(self) -> bool:  # ★ NEW
+        return self._started
+
     # ================================================================
     # Lifecycle
     # ================================================================
@@ -120,6 +126,13 @@ class SessionSlot(QObject):
 
     def start(self) -> None:
         """スレッドを起動する."""
+        if self._started:  # ★ NEW
+            logger.warning(
+                "Slot %d: already started, skipping",
+                self._slot_id,
+            )
+            return
+
         self.capture_thread.started.connect(self.capture_worker.start_capture)
         self.capture_thread.finished.connect(self.capture_worker.deleteLater)
 
@@ -131,6 +144,51 @@ class SessionSlot(QObject):
 
         if self._config.com_port:
             self.open_serial(self._config.com_port)
+
+        self._started = True  # ★ NEW
+
+    def activate_devices(self) -> None:  # ★ NEW
+        """デバイス (カメラ・シリアル) を起動/再接続する.
+
+        スレッドが未起動なら start() を呼ぶ。
+        すでに起動済みなら、カメラの再オープンとシリアルの接続を行う。
+        """
+        if not self._started:
+            self.start()
+            return
+
+        # カメラ再オープン
+        if self._config.camera_id >= 0:
+            try:
+                self.capture_worker.reopen_camera(self._config.camera_id)
+            except Exception as exc:
+                logger.warning(
+                    "Slot %d: failed to reopen camera: %s",
+                    self._slot_id,
+                    exc,
+                )
+
+        # シリアル再接続
+        if self._config.com_port:
+            try:
+                self.open_serial(self._config.com_port)
+            except Exception as exc:
+                logger.warning(
+                    "Slot %d: failed to open serial: %s",
+                    self._slot_id,
+                    exc,
+                )
+
+    def deactivate_devices(self) -> None:  # ★ NEW
+        """デバイス (カメラ・シリアル) を停止する (スレッドはそのまま)."""
+        try:
+            self.capture_worker.stop_capture()
+        except Exception:
+            pass
+        try:
+            self.serial_worker.close_port()
+        except Exception:
+            pass
 
     def shutdown(self, timeout_ms: int = 3000) -> None:
         """全リソースを安全に停止する."""
@@ -154,8 +212,11 @@ class SessionSlot(QObject):
             if not thread.wait(timeout_ms):
                 logger.warning(
                     "Slot %d: thread %s did not quit in %d ms",
-                    self._slot_id, thread.objectName(), timeout_ms,
+                    self._slot_id,
+                    thread.objectName(),
+                    timeout_ms,
                 )
+        self._started = False  # ★ NEW
 
     # ================================================================
     # Camera
@@ -217,9 +278,7 @@ class SessionSlot(QObject):
         sw = self.serial_worker
         if hasattr(sw, "serial_state_changed"):
             sw.serial_state_changed.connect(
-                lambda opened, label, _s=sid: self._on_serial_state(
-                    _s, opened, label
-                ),
+                lambda opened, label, _s=sid: self._on_serial_state(_s, opened, label),
                 Qt.ConnectionType.QueuedConnection,
             )
         if hasattr(sw, "log"):
@@ -235,8 +294,6 @@ class SessionSlot(QObject):
                 Qt.ConnectionType.QueuedConnection,
             )
 
-    def _on_serial_state(
-        self, slot_id: int, opened: bool, label: str
-    ) -> None:
+    def _on_serial_state(self, slot_id: int, opened: bool, label: str) -> None:
         self._serial_open = opened
         self.serial_state_changed.emit(slot_id, opened, label)

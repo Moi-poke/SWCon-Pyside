@@ -53,7 +53,7 @@ from libs.visual_macro.repository import VisualMacroRepository
 from ui.main_ui import Ui_MainWindow
 from ui.QtextLogger import QPlainTextEditLogger
 
-VERSION = "0.9.1 (beta)"
+VERSION = "0.9.2 (beta)"
 Author = "Moi"
 
 
@@ -2314,6 +2314,37 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             settings["multi_slot_layout"] = mode
         self.logger.debug(f"Layout changed to {mode}")
 
+    @Slot(int, bool)
+    def _on_slot_enabled_changed(self, slot_id: int, enabled: bool) -> None:
+        """ツールバーのチェックボックスによるスロット有効/無効切替."""
+        if self.slot_manager is None:
+            return
+
+        if enabled:
+            self.slot_manager.enable_slot(slot_id)
+        else:
+            self.slot_manager.disable_slot(slot_id)
+
+        # MultiSlotView のレイアウトを再構築
+        if hasattr(self, "multi_slot_view"):
+            self.multi_slot_view.refresh_enabled_layout()
+
+        # アクティブスロットが無効化された場合、最初の有効スロットに切替
+        if not enabled and slot_id == self.slot_manager.active_slot_index:
+            enabled_slots = self.slot_manager.enabled_slots
+            if enabled_slots:
+                new_active = enabled_slots[0].slot_id
+                self._on_multi_slot_active_changed(new_active)
+                if hasattr(self, "multi_slot_view"):
+                    self.multi_slot_view.update_slot_checkbox(
+                        slot_id,
+                        False,
+                    )
+
+        # 設定保存
+        self._save_current_slot_configs()
+        self.logger.info(f"Slot {slot_id}: {'enabled' if enabled else 'disabled'}")
+
     # ------------------------------------------------------------------
     # SlotManager シグナル → パネルステータス更新
     # ------------------------------------------------------------------
@@ -2492,6 +2523,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         )
         self.multi_slot_view.com_port_change_requested.connect(
             self._on_multi_slot_com_change,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        # ---- スロット有効/無効切替 ----
+        self.multi_slot_view.slot_enabled_changed.connect(
+            self._on_slot_enabled_changed,
             Qt.ConnectionType.QueuedConnection,
         )
 

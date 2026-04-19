@@ -1,4 +1,5 @@
 """SlotManager - 全 SessionSlot のライフサイクルを管理する."""
+
 from __future__ import annotations
 
 import logging
@@ -20,6 +21,7 @@ class SlotManager(QObject):
     slot_command_started = Signal(int, str)
     slot_command_stopped = Signal(int, bool)
     slot_serial_state_changed = Signal(int, bool, str)
+    slot_enabled_changed = Signal(int, bool)  # ★ NEW
 
     def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
@@ -83,12 +85,12 @@ class SlotManager(QObject):
             slot.log_message.connect(self.slot_log.emit)
             slot.command_started.connect(self.slot_command_started.emit)
             slot.command_stopped.connect(self.slot_command_stopped.emit)
-            slot.serial_state_changed.connect(
-                self.slot_serial_state_changed.emit
-            )
+            slot.serial_state_changed.connect(self.slot_serial_state_changed.emit)
             self._slots.append(slot)
         logger.info(
-            "Created %d slot(s) (subprocess=%s)", len(self._slots), use_subprocess,
+            "Created %d slot(s) (subprocess=%s)",
+            len(self._slots),
+            use_subprocess,
         )
 
     def build_all_session_controllers(
@@ -99,19 +101,75 @@ class SlotManager(QObject):
             kwargs = callback_factory(slot)
             slot.build_session_controller(**kwargs)
 
-    def start_all(self) -> None:
-        """有効な全スロットを起動する.
+    def start_all(self) -> None:  # ★ MODIFIED
+        """全スロットのスレッドを起動する.
 
-        サブプロセスモードではカメラが別プロセスで開かれるため、
-        同時起動しても DirectShow の競合は発生しない。
+        enabled なスロットはデバイスも起動する。
+        disabled なスロットはスレッドのみ起動しデバイスは停止したままにする。
+        これにより、後から UI で enabled に切り替えたときに
+        スレッド再作成なしでデバイスを起動できる。
         """
         for slot in self._slots:
+            slot.start()
             if slot.config.enabled:
-                slot.start()
                 logger.info(
-                    "Slot %d (%s) started",
-                    slot.slot_id, slot.config.display_label(),
+                    "Slot %d (%s) started (enabled)",
+                    slot.slot_id,
+                    slot.config.display_label(),
                 )
+            else:
+                # スレッドは起動したがデバイスは停止
+                slot.deactivate_devices()
+                logger.info(
+                    "Slot %d (%s) started (disabled — devices deactivated)",
+                    slot.slot_id,
+                    slot.config.display_label(),
+                )
+
+    # ================================================================
+    # スロット有効/無効切替                                      ★ NEW
+    # ================================================================
+
+    def enable_slot(self, slot_id: int) -> bool:
+        """スロットを有効化し、デバイスを起動する.
+
+        Returns True if successful.
+        """
+        slot = self.slot(slot_id)
+        if slot is None:
+            return False
+        if slot.config.enabled:
+            return True  # already enabled
+
+        slot.config.enabled = True
+        slot.activate_devices()
+        self.slot_enabled_changed.emit(slot_id, True)
+        logger.info("Slot %d: enabled", slot_id)
+        return True
+
+    def disable_slot(self, slot_id: int) -> bool:
+        """スロットを無効化し、デバイスを停止する.
+
+        Returns True if successful.
+        """
+        slot = self.slot(slot_id)
+        if slot is None:
+            return False
+        if not slot.config.enabled:
+            return True  # already disabled
+
+        # コマンド実行中なら停止
+        if slot.command_session is not None:
+            try:
+                slot.command_session.stop_all()
+            except Exception:
+                pass
+
+        slot.config.enabled = False
+        slot.deactivate_devices()
+        self.slot_enabled_changed.emit(slot_id, False)
+        logger.info("Slot %d: disabled", slot_id)
+        return True
 
     def shutdown_all(self, timeout_ms: int = 3000) -> None:
         """全スロットを安全にシャットダウンする."""
@@ -121,7 +179,8 @@ class SlotManager(QObject):
         logger.info("All slots shut down")
 
     def broadcast_start_python_command(
-        self, command_class: type,
+        self,
+        command_class: type,
     ) -> list[bool]:
         """全有効スロットで同一コマンドを一斉開始する."""
         results: list[bool] = []
@@ -134,7 +193,9 @@ class SlotManager(QObject):
                 results.append(True)
             except Exception as exc:
                 logger.error(
-                    "Slot %d: broadcast start failed: %s", slot.slot_id, exc,
+                    "Slot %d: broadcast start failed: %s",
+                    slot.slot_id,
+                    exc,
                 )
                 results.append(False)
         return results
@@ -148,7 +209,8 @@ class SlotManager(QObject):
                 except Exception as exc:
                     logger.error(
                         "Slot %d: broadcast stop failed: %s",
-                        slot.slot_id, exc,
+                        slot.slot_id,
+                        exc,
                     )
 
     def get_frame_from_slot(self, slot_id: int):

@@ -1,4 +1,5 @@
 """MultiSlotView — 並列表示コンテナ + レイアウト切替."""
+
 from __future__ import annotations
 
 import logging
@@ -6,6 +7,7 @@ from typing import Optional
 
 from PySide6.QtCore import Qt, QTimer, Signal, Slot
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QGridLayout,
     QHBoxLayout,
@@ -21,10 +23,10 @@ from libs.slot_panel_widget import SlotPanelWidget
 logger = logging.getLogger(__name__)
 
 _LAYOUT_DISPLAY_NAMES: dict[str, str] = {
-    "single":      "1×1 シングル",
-    "grid_2x2":    "2×2 グリッド",
-    "horizontal":  "横並び",
-    "vertical":    "縦並び",
+    "single": "1×1 シングル",
+    "grid_2x2": "2×2 グリッド",
+    "horizontal": "横並び",
+    "vertical": "縦並び",
 }
 
 # ストレッチ計算で使う最大行列数
@@ -35,22 +37,24 @@ class MultiSlotView(QWidget):
     """全スロットの並列プレビュー + 操作パネルを表示する."""
 
     # ---- signals (MainWindow が受け取る) ----
-    active_slot_changed = Signal(int)             # slot_id
-    layout_mode_changed = Signal(str)             # layout_key
-    slot_start_requested = Signal(int)            # slot_id
-    slot_stop_requested = Signal(int)             # slot_id
-    camera_change_requested = Signal(int, int)    # slot_id, camera_id
+    active_slot_changed = Signal(int)  # slot_id
+    layout_mode_changed = Signal(str)  # layout_key
+    slot_start_requested = Signal(int)  # slot_id
+    slot_stop_requested = Signal(int)  # slot_id
+    camera_change_requested = Signal(int, int)  # slot_id, camera_id
     com_port_change_requested = Signal(int, str)  # slot_id, port
+    slot_enabled_changed = Signal(int, bool)  # slot_id, enabled  ★NEW
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._panels: list[SlotPanelWidget] = []
+        self._slot_checkboxes: list[QCheckBox] = []
         self._active_slot_id: int = 0
         self._current_layout: str = "single"
 
-        # 自身が最大限スペースを取るようにする
         self.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding,
         )
 
         self._build_ui()
@@ -64,7 +68,7 @@ class MultiSlotView(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(2)
 
-        # ---- ツールバー行 (高さ固定、スペースを取らない) ----
+        # ---- ツールバー行 ----
         toolbar = QHBoxLayout()
         toolbar.setContentsMargins(4, 2, 4, 2)
 
@@ -78,15 +82,20 @@ class MultiSlotView(QWidget):
         self._combo_layout.currentIndexChanged.connect(self._on_layout_combo_changed)
         toolbar.addWidget(self._combo_layout)
 
+        # ---- スロット有効化チェックボックス用スペーサー + コンテナ ----
+        toolbar.addSpacing(16)
+        self._slot_cb_layout = QHBoxLayout()
+        self._slot_cb_layout.setSpacing(8)
+        toolbar.addLayout(self._slot_cb_layout)
+
         toolbar.addStretch()
         root.addLayout(toolbar)
 
-        # ---- パネル用グリッド (QWidget コンテナでラップ) ----
-        # QGridLayout を QWidget に載せ、addWidget(stretch=1) で
-        # 残りスペースを確実に埋める。
+        # ---- パネル用グリッド ----
         self._grid_container = QWidget()
         self._grid_container.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding,
         )
         self._grid = QGridLayout(self._grid_container)
         self._grid.setContentsMargins(2, 2, 2, 2)
@@ -108,20 +117,24 @@ class MultiSlotView(QWidget):
         session_slots: list[SessionSlot],
         active_slot_id: int = 0,
     ) -> None:
-        """SessionSlot のリストからパネルを構築する (enabled のみ)."""
-        # 既存パネルをクリア
+        """SessionSlot のリストからパネルとチェックボックスを構築する (全スロット)."""
+        # ---- 既存パネルをクリア ----
         for p in self._panels:
             self._grid.removeWidget(p)
             p.deleteLater()
         self._panels.clear()
 
-        # enabled なスロットだけパネルを作成
-        for slot in session_slots:
-            if not slot.config.enabled:
-                continue
+        # ---- 既存チェックボックスをクリア ----
+        while self._slot_cb_layout.count():
+            item = self._slot_cb_layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+        self._slot_checkboxes.clear()
 
-            # ★ parent を _grid_container にすることで、
-            #   グリッドコンテナのサイズに追従する
+        # ---- 全スロットのパネル + チェックボックスを作成 ----
+        for slot in session_slots:
+            # -- パネル --
             panel = SlotPanelWidget(slot.slot_id, parent=self._grid_container)
             panel.bind_session_slot(slot)
 
@@ -134,9 +147,25 @@ class MultiSlotView(QWidget):
 
             self._panels.append(panel)
 
-        # アクティブスロットが enabled パネルに含まれるか確認
-        if not self._find_panel(active_slot_id):
-            active_slot_id = self._panels[0].slot_id if self._panels else 0
+            # -- チェックボックス --
+            cb = QCheckBox(slot.config.display_label())
+            cb.setChecked(slot.config.enabled)
+            cb.setStyleSheet("font-size: 12px;")
+            sid = slot.slot_id  # ループ変数キャプチャ対策
+            cb.toggled.connect(
+                lambda checked, s=sid: self._on_slot_checkbox_toggled(s, checked)
+            )
+            self._slot_cb_layout.addWidget(cb)
+            self._slot_checkboxes.append(cb)
+
+        # ---- アクティブスロット ----
+        # active_slot_id が enabled パネルに含まれるか確認
+        enabled_panels = self._enabled_panels()
+        if enabled_panels:
+            if not any(p.slot_id == active_slot_id for p in enabled_panels):
+                active_slot_id = enabled_panels[0].slot_id
+        else:
+            active_slot_id = session_slots[0].slot_id if session_slots else 0
 
         self._active_slot_id = active_slot_id
         self._refresh_active_highlight()
@@ -186,13 +215,33 @@ class MultiSlotView(QWidget):
         """プレビュータイマーを停止する."""
         self._preview_timer.stop()
 
+    def refresh_enabled_layout(self) -> None:
+        """有効状態の変更後にレイアウトを再適用する.
+
+        MainWindow が enable_slot / disable_slot を呼んだ後に使う。
+        """
+        self._apply_layout()
+
+    def update_slot_checkbox(self, slot_id: int, enabled: bool) -> None:
+        """チェックボックスの状態をプログラム的に更新する (シグナル抑制)."""
+        if 0 <= slot_id < len(self._slot_checkboxes):
+            cb = self._slot_checkboxes[slot_id]
+            cb.blockSignals(True)
+            cb.setChecked(enabled)
+            cb.blockSignals(False)
+
+    def update_slot_checkbox_label(self, slot_id: int, label: str) -> None:
+        """チェックボックスのテキストを更新する."""
+        if 0 <= slot_id < len(self._slot_checkboxes):
+            self._slot_checkboxes[slot_id].setText(label)
+
     @property
     def active_slot_id(self) -> int:
         return self._active_slot_id
 
     @property
     def enabled_panel_count(self) -> int:
-        return len(self._panels)
+        return len(self._enabled_panels())
 
     # ================================================================
     # Internal — パネル検索
@@ -204,12 +253,16 @@ class MultiSlotView(QWidget):
                 return p
         return None
 
+    def _enabled_panels(self) -> list[SlotPanelWidget]:
+        """enabled なパネルだけを返す."""
+        return [p for p in self._panels if p.is_enabled]
+
     # ================================================================
     # Internal — レイアウト
     # ================================================================
 
     def _apply_layout(self) -> None:
-        """現在のレイアウト設定に従ってパネルを配置し直す."""
+        """現在のレイアウト設定に従って enabled パネルを配置し直す."""
         # グリッドから全パネルを一旦外す
         for p in self._panels:
             self._grid.removeWidget(p)
@@ -220,7 +273,8 @@ class MultiSlotView(QWidget):
             self._grid.setRowStretch(i, 0)
             self._grid.setColumnStretch(i, 0)
 
-        count = len(self._panels)
+        panels = self._enabled_panels()
+        count = len(panels)
         if count == 0:
             return
 
@@ -229,23 +283,29 @@ class MultiSlotView(QWidget):
         used_cols = 0
 
         if layout == "single":
-            for p in self._panels:
-                if p.slot_id == self._active_slot_id:
-                    self._grid.addWidget(p, 0, 0)
-                    p.show()
+            # アクティブスロットが enabled なら表示、そうでなければ最初の enabled
+            target = self._active_slot_id
+            target_panel = None
+            for p in panels:
+                if p.slot_id == target:
+                    target_panel = p
                     break
+            if target_panel is None:
+                target_panel = panels[0]
+            self._grid.addWidget(target_panel, 0, 0)
+            target_panel.show()
             used_rows = 1
             used_cols = 1
 
         elif layout == "horizontal":
-            for i, p in enumerate(self._panels):
+            for i, p in enumerate(panels):
                 self._grid.addWidget(p, 0, i)
                 p.show()
             used_rows = 1
             used_cols = count
 
         elif layout == "vertical":
-            for i, p in enumerate(self._panels):
+            for i, p in enumerate(panels):
                 self._grid.addWidget(p, i, 0)
                 p.show()
             used_rows = count
@@ -253,7 +313,7 @@ class MultiSlotView(QWidget):
 
         elif layout == "grid_2x2":
             cols = 2
-            for i, p in enumerate(self._panels):
+            for i, p in enumerate(panels):
                 r = i // cols
                 c = i % cols
                 self._grid.addWidget(p, r, c)
@@ -262,13 +322,13 @@ class MultiSlotView(QWidget):
             used_cols = min(count, cols)
 
         else:
-            for i, p in enumerate(self._panels):
+            for i, p in enumerate(panels):
                 self._grid.addWidget(p, i, 0)
                 p.show()
             used_rows = count
             used_cols = 1
 
-        # 使用行列にストレッチ係数を設定 → 均等に領域を分割
+        # 使用行列にストレッチ係数を設定
         for r in range(used_rows):
             self._grid.setRowStretch(r, 1)
         for c in range(used_cols):
@@ -299,6 +359,10 @@ class MultiSlotView(QWidget):
             self._current_layout = key
             self._apply_layout()
             self.layout_mode_changed.emit(key)
+
+    def _on_slot_checkbox_toggled(self, slot_id: int, checked: bool) -> None:
+        """ツールバーのスロットチェックボックスが切り替わった."""
+        self.slot_enabled_changed.emit(slot_id, checked)
 
     @Slot()
     def _tick_preview(self) -> None:

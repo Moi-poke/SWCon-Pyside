@@ -1,4 +1,5 @@
 """SlotPanelWidget — 1スロット分のUI パネル."""
+
 from __future__ import annotations
 
 import logging
@@ -46,7 +47,8 @@ class _PreviewWidget(QWidget):
         self._pixmap: Optional[QPixmap] = None
 
         self.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding,
         )
 
         # 背景色
@@ -124,9 +126,9 @@ class SlotPanelWidget(QFrame):
     """1スロット分のプレビュー + 操作UIパネル."""
 
     # ---- signals ----
-    activated = Signal(int)                     # slot_id
-    start_requested = Signal(int)               # slot_id
-    stop_requested = Signal(int)                # slot_id
+    activated = Signal(int)  # slot_id
+    start_requested = Signal(int)  # slot_id
+    stop_requested = Signal(int)  # slot_id
     camera_change_requested = Signal(int, int)  # slot_id, camera_id
     com_port_change_requested = Signal(int, str)  # slot_id, port
 
@@ -146,7 +148,8 @@ class SlotPanelWidget(QFrame):
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setStyleSheet(_INACTIVE_STYLE)
         self.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding,
         )
 
         self._build_ui()
@@ -166,14 +169,16 @@ class SlotPanelWidget(QFrame):
         self._label = QLabel(f"Slot {self._slot_id}")
         self._label.setStyleSheet("font-weight: bold; font-size: 13px;")
         self._label.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed,
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Fixed,
         )
         header.addWidget(self._label)
 
         self._serial_status = QLabel("Serial: —")
         self._serial_status.setStyleSheet("color: gray; font-size: 11px;")
         self._serial_status.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed,
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Fixed,
         )
         header.addStretch()
         header.addWidget(self._serial_status)
@@ -189,7 +194,8 @@ class SlotPanelWidget(QFrame):
         self._cmd_status = QLabel("Idle")
         self._cmd_status.setStyleSheet("font-size: 11px;")
         self._cmd_status.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed,
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Fixed,
         )
         cmd_row.addWidget(self._cmd_status, stretch=1)
 
@@ -205,9 +211,7 @@ class SlotPanelWidget(QFrame):
         self._btn_stop.setFixedWidth(40)
         self._btn_stop.setToolTip("コマンド停止")
         self._btn_stop.setEnabled(False)
-        self._btn_stop.clicked.connect(
-            lambda: self.stop_requested.emit(self._slot_id)
-        )
+        self._btn_stop.clicked.connect(lambda: self.stop_requested.emit(self._slot_id))
         cmd_row.addWidget(self._btn_stop)
         root.addLayout(cmd_row, stretch=0)
 
@@ -218,7 +222,8 @@ class SlotPanelWidget(QFrame):
         self._combo_camera = QComboBox()
         self._combo_camera.setToolTip("カメラ選択")
         self._combo_camera.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed,
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Fixed,
         )
         self._combo_camera.currentIndexChanged.connect(self._on_camera_changed)
         dev_row.addWidget(self._combo_camera, stretch=2)
@@ -228,7 +233,8 @@ class SlotPanelWidget(QFrame):
         self._edit_com.setToolTip("COMポート (例: COM3)")
         self._edit_com.setMaximumWidth(100)
         self._edit_com.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed,
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Fixed,
         )
         self._edit_com.editingFinished.connect(self._on_com_changed)
         dev_row.addWidget(self._edit_com, stretch=1)
@@ -242,6 +248,13 @@ class SlotPanelWidget(QFrame):
     @property
     def slot_id(self) -> int:
         return self._slot_id
+
+    @property
+    def is_enabled(self) -> bool:
+        """このスロットが有効かどうかを返す."""
+        if self._session_slot is None:
+            return False
+        return self._session_slot.config.enabled
 
     @property
     def preview_label(self) -> _PreviewWidget:
