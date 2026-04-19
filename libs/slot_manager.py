@@ -58,13 +58,27 @@ class SlotManager(QObject):
     def enabled_count(self) -> int:
         return len(self.enabled_slots)
 
-    def create_slots(self, configs: list[SlotConfig]) -> None:
-        """設定リストからスロットを作成する."""
+    def create_slots(
+        self,
+        configs: list[SlotConfig],
+        use_subprocess: bool = True,
+    ) -> None:
+        """設定リストからスロットを作成する.
+
+        Parameters
+        ----------
+        configs : list[SlotConfig]
+            スロット設定リスト
+        use_subprocess : bool
+            True の場合、各スロットのカメラキャプチャをサブプロセスで実行する。
+            マルチカメラ環境では True 推奨。
+        """
         for config in configs[:MAX_SLOTS]:
             slot = SessionSlot(
                 config=config,
                 frame_registry=self.frame_registry,
                 parent=self,
+                use_subprocess=use_subprocess,
             )
             slot.log_message.connect(self.slot_log.emit)
             slot.command_started.connect(self.slot_command_started.emit)
@@ -73,7 +87,9 @@ class SlotManager(QObject):
                 self.slot_serial_state_changed.emit
             )
             self._slots.append(slot)
-        logger.info("Created %d slot(s)", len(self._slots))
+        logger.info(
+            "Created %d slot(s) (subprocess=%s)", len(self._slots), use_subprocess,
+        )
 
     def build_all_session_controllers(
         self, callback_factory: Callable[[SessionSlot], dict[str, Any]]
@@ -84,7 +100,11 @@ class SlotManager(QObject):
             slot.build_session_controller(**kwargs)
 
     def start_all(self) -> None:
-        """有効な全スロットを起動する."""
+        """有効な全スロットを起動する.
+
+        サブプロセスモードではカメラが別プロセスで開かれるため、
+        同時起動しても DirectShow の競合は発生しない。
+        """
         for slot in self._slots:
             if slot.config.enabled:
                 slot.start()

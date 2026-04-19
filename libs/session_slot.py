@@ -35,6 +35,7 @@ class SessionSlot(QObject):
         config: SlotConfig,
         frame_registry: FrameStoreRegistry,
         parent: Optional[QObject] = None,
+        use_subprocess: bool = False,
     ) -> None:
         super().__init__(parent)
         self._config = config
@@ -53,6 +54,7 @@ class SessionSlot(QObject):
             camera_id=config.camera_id,
             fps=config.fps,
             frame_store=self.frame_store,
+            use_subprocess=use_subprocess,
         )
         self.capture_worker.moveToThread(self.capture_thread)
 

@@ -140,6 +140,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.setting = Setting()
 
         self.setupUi(self)
+
         self.setWindowTitle(f"SWController {VERSION}")
 
         self._setup_log_widget()
@@ -151,18 +152,23 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             raise RuntimeError("Settings are not loaded")
         self.setup_functions_connect()
 
+        py_cmd = settings["command"]["py_command"]
+        mcu_cmd = settings["command"]["mcu_command"]
+        visual_cmd = settings["command"]["visual_macro_command"]
+
         self.connect_slot_manager()
+        self.setup_multi_slot_view()
         self.connect_gamepad()
         self.setup_visual_macro_editor()
 
         self.load_commands()
         self.show_serial()
 
-        py_cmd = settings["command"]["py_command"]
-        mcu_cmd = settings["command"]["mcu_command"]
-        visual_cmd = settings["command"].get("visual_macro_command", "")
-
         try:
+            self.comboBoxPython.blockSignals(True)
+            self.comboBox_MCU.blockSignals(True)
+            self.comboBox_VisualMacro.blockSignals(True)
+
             mcu_idx = self.comboBox_MCU.findText(mcu_cmd)
             if mcu_idx >= 0:
                 self.comboBox_MCU.setCurrentIndex(mcu_idx)
@@ -171,22 +177,45 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             if py_idx >= 0:
                 self.comboBoxPython.setCurrentIndex(py_idx)
 
-            if visual_cmd:
-                visual_idx = self.comboBox_VisualMacro.findText(visual_cmd)
-                if visual_idx >= 0:
-                    self.comboBox_VisualMacro.setCurrentIndex(visual_idx)
+            visual_idx = self.comboBox_VisualMacro.findText(visual_cmd)
+            if visual_idx >= 0:
+                self.comboBox_VisualMacro.setCurrentIndex(visual_idx)
 
         except Exception:
             self.logger.debug("There seems to have been a change in the script.")
+        finally:
+            self.comboBoxPython.blockSignals(False)
+            self.comboBox_MCU.blockSignals(False)
+            self.comboBox_VisualMacro.blockSignals(False)
+
+        # Manually sync after unblocking
+        self.assign_command()
+        self.assign_py_command_to_setting()
+        self.assign_mcu_command_to_setting()
+        self.assign_visual_macro_command_to_setting()
+
+        # Tell the editor to open the last-used Visual Macro document
+        if (
+            self.current_visual_descriptor is not None
+            and self.visual_macro_editor is not None
+        ):
+            try:
+                startup_path = self.visual_macro_repository.to_relative_path(
+                    self.current_visual_descriptor.source_path
+                )
+                self.visual_macro_editor.set_startup_document_path(startup_path)
+            except Exception:
+                pass
 
         self._init_camera_name_list()
 
-        if self.camera_list:
-            target_id = str(settings["main_window"]["must"]["camera_id"])
-            for i, cam in enumerate(self.camera_list):
-                if str(cam["index"]) == target_id:
-                    self.comboBoxCameraNames.setCurrentIndex(i)
-                    break
+        # if self.camera_list:
+        #     target_id = str(settings["main_window"]["must"]["camera_id"])
+        #     for i, cam in enumerate(self.camera_list):
+        #         if str(cam["index"]) == target_id:
+        #             self.comboBoxCameraNames.setCurrentIndex(i)
+        #             break
+        self._sync_old_ui_from_active_slot()
 
         self.activate_serial()
 
@@ -260,6 +289,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 }
             )
             self.camera_dic[str(cam.index)] = cam.name
+        if hasattr(self, "multi_slot_view"):
+            self.multi_slot_view.set_camera_list_all(self.camera_list)
+        if self.slot_manager is not None:
+            self.multi_slot_view.sync_slot_devices(self.slot_manager.slots)
 
     # ------------------------------------------------------------------
     # worker wiring
@@ -434,38 +467,39 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         )
         if hasattr(self.command_runtime, "highlight_block_requested"):
             self.command_runtime.highlight_block_requested.connect(
-                self.on_visual_macro_highlight_requested,
+                self._on_visual_macro_highlight_requested,
                 Qt.ConnectionType.QueuedConnection,
             )
         if hasattr(self.command_runtime, "clear_block_highlight_requested"):
             self.command_runtime.clear_block_highlight_requested.connect(
-                self.on_visual_macro_highlight_cleared,
+                self._on_visual_macro_highlight_cleared,
                 Qt.ConnectionType.QueuedConnection,
             )
 
     @Slot()
     def render_latest_preview(self) -> None:
-        image, seq = self.frame_store.get_preview_if_new(self._last_preview_seq)
-        if image is None:
-            return
+        # image, seq = self.frame_store.get_preview_if_new(self._last_preview_seq)
+        # if image is None:
+        #     return
 
-        self._last_preview_seq = seq
-        self.img = image
-        pix = QPixmap.fromImage(image)
-        self.CaptureImageArea.setPixmap(pix)
+        # self._last_preview_seq = seq
+        # self.img = image
+        # pix = QPixmap.fromImage(image)
+        # self.CaptureImageArea.setPixmap(pix)
+        self._update_active_frame_img()
 
     # ------------------------------------------------------------------
     # visual macro
     # ------------------------------------------------------------------
 
     @Slot(str)
-    def on_visual_macro_highlight_requested(self, block_id: str) -> None:
+    def _on_visual_macro_highlight_requested(self, block_id: str) -> None:
         if self.visual_macro_editor is None:
             return
         self.visual_macro_editor.bridge.highlight_block_requested.emit(block_id)
 
     @Slot()
-    def on_visual_macro_highlight_cleared(self) -> None:
+    def _on_visual_macro_highlight_cleared(self) -> None:
         if self.visual_macro_editor is None:
             return
         self.visual_macro_editor.bridge.clear_block_highlight_requested.emit()
@@ -511,9 +545,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         normalized = self._normalize_visual_macro_relative_path(relative_path)
 
         if not normalized:
-            # editor が無題状態なら VM 一覧選択は外す
-            self._set_visual_macro_combo_index_safely(-1)
-            self.current_visual_descriptor = None
+            # editor が無題状態 — コンボの選択は維持
             return
 
         index = self._find_visual_macro_combo_index_by_source_path(normalized)
@@ -639,15 +671,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.visual_macro_editor = editor
 
         editor.run_requested.connect(
-            self.on_visual_macro_run_requested,
+            self._on_visual_macro_run_requested,
             Qt.ConnectionType.QueuedConnection,
         )
         editor.stop_requested.connect(
-            self.on_visual_macro_stop_requested,
+            self._on_visual_macro_stop_requested,
             Qt.ConnectionType.QueuedConnection,
         )
         editor.status_message.connect(
-            self.on_visual_macro_status_message,
+            self._on_visual_macro_status_message,
             Qt.ConnectionType.QueuedConnection,
         )
 
@@ -656,7 +688,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self._setup_visual_macro_toggle_action()
 
         editor.document_state_changed.connect(
-            self.on_visual_macro_document_state_changed,
+            self._on_visual_macro_document_state_changed,
             Qt.ConnectionType.QueuedConnection,
         )
 
@@ -956,11 +988,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.visual_macro_toggle_action.setChecked(visible)
 
     @Slot(str)
-    def on_visual_macro_status_message(self, message: str) -> None:
+    def _on_visual_macro_status_message(self, message: str) -> None:
         self.logger.debug(f"[VisualMacro] {message}")
 
     @Slot(str)
-    def on_visual_macro_run_requested(self, program_json: str) -> None:
+    def _on_visual_macro_run_requested(self, program_json: str) -> None:
         if self.command_session is None:
             self.logger.error("Command session controller is not ready.")
             return
@@ -1044,14 +1076,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.logger.error("Visual Macro start request was rejected.")
 
     @Slot()
-    def on_visual_macro_stop_requested(self) -> None:
+    def _on_visual_macro_stop_requested(self) -> None:
         if self.command_session is None:
             self.logger.error("Command session controller is not ready.")
             return
         self.command_session.stop_python_command(block=False)
 
     @Slot(str, bool)
-    def on_visual_macro_document_state_changed(
+    def _on_visual_macro_document_state_changed(
         self,
         relative_path: str,
         modified: bool,
@@ -1168,7 +1200,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     # ------------------------------------------------------------------
     def setup_functions_connect(self) -> None:
         self.pushButtonReloadCamera.pressed.connect(
-            lambda: self.reconnect_camera(self.lineEditCameraID.text())
+            # lambda: self.reconnect_camera(self.lineEditCameraID.text())
+            self._on_reload_camera_for_active_slot
         )
         self.pushButtonReloadCamera.pressed.connect(self.reload_camera)
 
@@ -1207,14 +1240,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.pushButton_PythonReload.clicked.connect(self.reload_commands)
         self.pushButton_MCUReload.clicked.connect(self.reload_commands)
-        self.pushButtonReloadPort.clicked.connect(self.activate_serial)
+        self.pushButtonReloadPort.clicked.connect(
+            # self.activate_serial
+            self._on_reload_port_for_active_slot
+        )
 
         self.pushButtonScreenShot.clicked.connect(self.screen_shot)
         self.toolButtonOpenScreenShotDir.clicked.connect(self.open_screen_shot_dir)
         self.toolButtonOpenPythonDir.clicked.connect(self.open_python_shot_dir)
         self.toolButton_OpenMCUDir.clicked.connect(self.open_mcu_shot_dir)
         self.comboBoxCameraNames.currentIndexChanged.connect(
-            self.handle_camera_selection_changed
+            # self.handle_camera_selection_changed
+            self._on_camera_combo_changed_for_active_slot
         )
         self.tabWidget.currentChanged.connect(self.set_command_mode)
         self.tabWidget.currentChanged.connect(self.assign_command)
@@ -1428,6 +1465,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     # ------------------------------------------------------------------
     # commands
     # ------------------------------------------------------------------
+
     def load_commands(self) -> None:
         self.command_catalog = CommandCatalog()
         self.command_catalog.load()
@@ -1448,55 +1486,62 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.logger.error(f"Error while loading {k}\n>>> {v}")
 
     def set_command_items(self) -> None:
-        self.comboBoxPython.clear()
-        self.comboBox_MCU.clear()
-        self.comboBox_VisualMacro.clear()
+        self.comboBoxPython.blockSignals(True)
+        self.comboBox_MCU.blockSignals(True)
+        self.comboBox_VisualMacro.blockSignals(True)
+        try:
+            self.comboBoxPython.clear()
+            self.comboBox_MCU.clear()
+            self.comboBox_VisualMacro.clear()
 
-        if self.command_catalog is None:
-            return
+            if self.command_catalog is None:
+                return
 
-        for index, descriptor in enumerate(self.command_catalog.python_descriptors):
-            self.comboBoxPython.addItem(descriptor.display_name)
+            for index, descriptor in enumerate(self.command_catalog.python_descriptors):
+                self.comboBoxPython.addItem(descriptor.display_name)
 
-            if descriptor.tooltip is not None:
-                self.comboBoxPython.setItemData(
-                    index,
-                    descriptor.tooltip,
-                    Qt.ItemDataRole.ToolTipRole,
-                )
+                if descriptor.tooltip is not None:
+                    self.comboBoxPython.setItemData(
+                        index,
+                        descriptor.tooltip,
+                        Qt.ItemDataRole.ToolTipRole,
+                    )
 
-            if descriptor.foreground is not None:
-                self.comboBoxPython.setItemData(
-                    index,
-                    descriptor.foreground,
-                    QtCore.Qt.ItemDataRole.ForegroundRole,
-                )
+                if descriptor.foreground is not None:
+                    self.comboBoxPython.setItemData(
+                        index,
+                        descriptor.foreground,
+                        QtCore.Qt.ItemDataRole.ForegroundRole,
+                    )
 
-        for index, descriptor in enumerate(self.command_catalog.visual_descriptors):
-            self.comboBox_VisualMacro.addItem(descriptor.display_name)
-            if descriptor.tooltip is not None:
-                self.comboBox_VisualMacro.setItemData(
-                    index,
-                    descriptor.tooltip,
-                    Qt.ItemDataRole.ToolTipRole,
-                )
-            if descriptor.foreground is not None:
-                self.comboBox_VisualMacro.setItemData(
-                    index,
-                    descriptor.foreground,
-                    Qt.ItemDataRole.ForegroundRole,
-                )
+            for index, descriptor in enumerate(self.command_catalog.visual_descriptors):
+                self.comboBox_VisualMacro.addItem(descriptor.display_name)
+                if descriptor.tooltip is not None:
+                    self.comboBox_VisualMacro.setItemData(
+                        index,
+                        descriptor.tooltip,
+                        Qt.ItemDataRole.ToolTipRole,
+                    )
+                if descriptor.foreground is not None:
+                    self.comboBox_VisualMacro.setItemData(
+                        index,
+                        descriptor.foreground,
+                        Qt.ItemDataRole.ForegroundRole,
+                    )
 
-        if self.comboBox_VisualMacro.count() > 0:
-            self.comboBox_VisualMacro.setCurrentIndex(0)
+            for descriptor in self.command_catalog.mcu_descriptors:
+                self.comboBox_MCU.addItem(descriptor.display_name)
 
-        for descriptor in self.command_catalog.mcu_descriptors:
-            self.comboBox_MCU.addItem(descriptor.display_name)
-
-        if self.comboBoxPython.count() > 0:
-            self.comboBoxPython.setCurrentIndex(0)
-        if self.comboBox_MCU.count() > 0:
-            self.comboBox_MCU.setCurrentIndex(0)
+            if self.comboBoxPython.count() > 0:
+                self.comboBoxPython.setCurrentIndex(0)
+            if self.comboBox_MCU.count() > 0:
+                self.comboBox_MCU.setCurrentIndex(0)
+            if self.comboBox_VisualMacro.count() > 0:
+                self.comboBox_VisualMacro.setCurrentIndex(0)
+        finally:
+            self.comboBoxPython.blockSignals(False)
+            self.comboBox_MCU.blockSignals(False)
+            self.comboBox_VisualMacro.blockSignals(False)
 
     def assign_command(self) -> None:
         if self.command_catalog is None:
@@ -1693,31 +1738,43 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.set_command_items()
 
-        if self.command_catalog is not None:
-            mcu_idx = self.command_catalog.find_mcu_index_by_name(old_val_mcu)
-            if mcu_idx != -1:
-                self.comboBox_MCU.setCurrentIndex(mcu_idx)
-            elif self.comboBox_MCU.count() > 0:
-                self.comboBox_MCU.setCurrentIndex(0)
+        self.comboBoxPython.blockSignals(True)
+        self.comboBox_MCU.blockSignals(True)
+        self.comboBox_VisualMacro.blockSignals(True)
+        try:
+            if self.command_catalog is not None:
+                mcu_idx = self.command_catalog.find_mcu_index_by_name(old_val_mcu)
+                if mcu_idx != -1:
+                    self.comboBox_MCU.setCurrentIndex(mcu_idx)
+                elif self.comboBox_MCU.count() > 0:
+                    self.comboBox_MCU.setCurrentIndex(0)
 
-            py_idx = self.command_catalog.find_python_index_by_name(old_val_py)
-            if py_idx != -1:
-                self.comboBoxPython.setCurrentIndex(py_idx)
-            elif self.comboBoxPython.count() > 0:
-                self.comboBoxPython.setCurrentIndex(0)
+                py_idx = self.command_catalog.find_python_index_by_name(old_val_py)
+                if py_idx != -1:
+                    self.comboBoxPython.setCurrentIndex(py_idx)
+                elif self.comboBoxPython.count() > 0:
+                    self.comboBoxPython.setCurrentIndex(0)
 
-        if old_visual_source_path:
-            visual_idx = self._find_visual_macro_combo_index_by_source_path(
-                old_visual_source_path
-            )
-            if visual_idx != -1:
-                self.comboBox_VisualMacro.setCurrentIndex(visual_idx)
+            if old_visual_source_path:
+                visual_idx = self._find_visual_macro_combo_index_by_source_path(
+                    old_visual_source_path
+                )
+                if visual_idx != -1:
+                    self.comboBox_VisualMacro.setCurrentIndex(visual_idx)
+                elif self.comboBox_VisualMacro.count() > 0:
+                    self.comboBox_VisualMacro.setCurrentIndex(0)
             elif self.comboBox_VisualMacro.count() > 0:
                 self.comboBox_VisualMacro.setCurrentIndex(0)
-        elif self.comboBox_VisualMacro.count() > 0:
-            self.comboBox_VisualMacro.setCurrentIndex(0)
+
+        finally:
+            self.comboBoxPython.blockSignals(False)
+            self.comboBox_MCU.blockSignals(False)
+            self.comboBox_VisualMacro.blockSignals(False)
 
         self.assign_command()
+        self.assign_py_command_to_setting()
+        self.assign_mcu_command_to_setting()
+        self.assign_visual_macro_command_to_setting()
 
         if self.command_catalog is not None:
             if (
@@ -1983,6 +2040,479 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self.template_matching_support_tool is not None:
             self.template_matching_support_tool.create_scene(get_img=False)
 
+    # ---
+    # Multi Slot
+    # ---
+
+    # ------------------------------------------------------------------
+    # アクティブスロット切替
+    # ------------------------------------------------------------------
+
+    @Slot(int)
+    def _on_multi_slot_active_changed(self, slot_id: int) -> None:
+        """パネルクリックによるアクティブスロットの切替."""
+        if self.slot_manager is None:
+            return
+
+        self.slot_manager.set_active_slot(slot_id)
+        active = self.slot_manager.active_slot
+        if active is None:
+            return
+
+        # 後方互換参照の再配線
+        self.frame_store = active.frame_store
+        self.capture_worker = active.capture_worker
+        self.capture_thread = active.capture_thread
+        self.serial_worker = active.serial_worker
+        self.serial_thread = active.serial_thread
+        self.command_runtime = active.command_runtime
+        self.command_session = active.command_session
+        self.gui_stick_store = active.gui_stick_store
+
+        # 旧UIの表示をアクティブスロットに同期
+        self._sync_old_ui_from_active_slot()
+
+        # ゲームパッドルーティング先を更新
+        self._sync_command_buttons()
+
+        # 設定に保存
+        settings = self.setting.setting
+        if settings is not None:
+            settings["active_gamepad_slot"] = slot_id
+
+        self.logger.debug(f"Active slot changed to {slot_id}")
+
+    # ------------------------------------------------------------------
+    # 旧UIとアクティブスロットの同期
+    # ------------------------------------------------------------------
+
+    def _sync_old_ui_from_active_slot(self) -> None:
+        """旧UIのカメラ/COM/FPS 表示をアクティブスロットの設定に同期する."""
+        if self.slot_manager is None:
+            return
+        active = self.slot_manager.active_slot
+        if active is None:
+            return
+
+        cfg = active.config
+
+        # カメラID
+        self.lineEditCameraID.blockSignals(True)
+        self.lineEditCameraID.setText(str(cfg.camera_id))
+        self.lineEditCameraID.blockSignals(False)
+
+        # COMポート
+        self.lineEditComPort.blockSignals(True)
+        self.lineEditComPort.setText(cfg.com_port)
+        self.lineEditComPort.blockSignals(False)
+
+        # カメラ名コンボボックス同期
+        if hasattr(self, "camera_list") and self.camera_list:
+            self.comboBoxCameraNames.blockSignals(True)
+            for i, cam in enumerate(self.camera_list):
+                if int(cam["index"]) == cfg.camera_id:
+                    self.comboBoxCameraNames.setCurrentIndex(i)
+                    break
+            self.comboBoxCameraNames.blockSignals(False)
+
+    # ------------------------------------------------------------------
+    # 旧UIボタンからのカメラ/シリアルリロード
+    # ------------------------------------------------------------------
+
+    def _on_reload_camera_for_active_slot(self) -> None:
+        """旧UIの「カメラ再読み込み」ボタン → アクティブスロットのカメラを再オープン."""
+        if self.slot_manager is None:
+            return
+        active = self.slot_manager.active_slot
+        if active is None:
+            return
+
+        try:
+            camera_id = int(self.lineEditCameraID.text())
+        except (ValueError, TypeError):
+            self.logger.error(f"Invalid camera id: {self.lineEditCameraID.text()}")
+            return
+
+        active.reopen_camera(camera_id)
+        self.logger.info(f"Slot {active.slot_id}: camera reloaded to {camera_id}")
+
+        # パネルにも反映
+        if hasattr(self, "multi_slot_view"):
+            p = self.multi_slot_view.panel(active.slot_id)
+            if p is not None:
+                p.select_camera(camera_id)
+
+        # 設定保存
+        self._save_current_slot_configs()
+
+    def _on_reload_port_for_active_slot(self) -> None:
+        """旧UIの「ポート再読み込み」ボタン → アクティブスロットのシリアルを再接続."""
+        if self.slot_manager is None:
+            return
+        active = self.slot_manager.active_slot
+        if active is None:
+            return
+
+        port = self.lineEditComPort.text().strip()
+
+        active.close_serial()
+        if port:
+            active.open_serial(port)
+        self.logger.info(f"Slot {active.slot_id}: serial reloaded to '{port}'")
+
+        # パネルにも反映
+        if hasattr(self, "multi_slot_view"):
+            p = self.multi_slot_view.panel(active.slot_id)
+            if p is not None:
+                p.set_com_port(port)
+
+        # 設定保存
+        self._save_current_slot_configs()
+
+    def _on_camera_combo_changed_for_active_slot(self, index: int) -> None:
+        """旧UIのカメラ名コンボボックス変更 → アクティブスロットのカメラを変更."""
+        if not hasattr(self, "camera_list"):
+            return
+        if index < 0 or index >= len(self.camera_list):
+            return
+        if self.slot_manager is None:
+            return
+        active = self.slot_manager.active_slot
+        if active is None:
+            return
+
+        cam_index = int(self.camera_list[index]["index"])
+
+        # lineEditCameraID も更新
+        self.lineEditCameraID.blockSignals(True)
+        self.lineEditCameraID.setText(str(cam_index))
+        self.lineEditCameraID.blockSignals(False)
+
+        active.reopen_camera(cam_index)
+        self.logger.info(
+            f"Slot {active.slot_id}: camera changed to "
+            f"{self.camera_list[index]['name']} (index={cam_index})"
+        )
+
+        # パネルにも反映
+        if hasattr(self, "multi_slot_view"):
+            p = self.multi_slot_view.panel(active.slot_id)
+            if p is not None:
+                p.select_camera(cam_index)
+
+        # 設定保存
+        self._save_current_slot_configs()
+
+    # ------------------------------------------------------------------
+    # パネルからのコマンド操作
+    # ------------------------------------------------------------------
+
+    @Slot(int)
+    def _on_multi_slot_start(self, slot_id: int) -> None:
+        """パネルの▶ボタンによるコマンド開始."""
+        if self.slot_manager is None:
+            return
+
+        slot = self.slot_manager.slot(slot_id)
+        if slot is None or slot.command_session is None:
+            self.logger.error(f"Slot {slot_id}: command session not ready")
+            return
+
+        # 現在のPythonタブで選択中のコマンドクラスを使用
+        self.assign_command()
+        if self.current_python_descriptor is None:
+            self.logger.error("No Python command is selected.")
+            return
+
+        from libs.command_models import CommandExecutionContext, CommandTriggerSource
+
+        context = CommandExecutionContext(
+            command_id=self.current_python_descriptor.command_id,
+            kind=self.current_python_descriptor.kind.value,
+            display_name=self.current_python_descriptor.display_name,
+            source_path=self.current_python_descriptor.source_path,
+            trigger_source=CommandTriggerSource.UI_COMBO.value,
+        )
+
+        started = slot.command_session.start_python_command(
+            self.current_python_descriptor.command_class,
+            context,
+        )
+        if started:
+            self.logger.info(
+                f"Slot {slot_id}: started {self.current_python_descriptor.display_name}"
+            )
+
+    @Slot(int)
+    def _on_multi_slot_stop(self, slot_id: int) -> None:
+        """パネルの⏹ボタンによるコマンド停止."""
+        if self.slot_manager is None:
+            return
+
+        slot = self.slot_manager.slot(slot_id)
+        if slot is None or slot.command_session is None:
+            return
+
+        slot.command_session.stop_python_command(block=False)
+        self.logger.info(f"Slot {slot_id}: stop requested")
+
+    # ------------------------------------------------------------------
+    # パネルからのデバイス変更
+    # ------------------------------------------------------------------
+
+    @Slot(int, int)
+    def _on_multi_slot_camera_change(self, slot_id: int, camera_id: int) -> None:
+        """パネルのカメラ変更."""
+        if self.slot_manager is None:
+            return
+
+        slot = self.slot_manager.slot(slot_id)
+        if slot is None:
+            return
+
+        slot.reopen_camera(camera_id)
+        self.logger.info(f"Slot {slot_id}: camera changed to {camera_id}")
+
+        # 設定保存
+        self._save_current_slot_configs()
+
+        # アクティブスロットなら旧UIにも反映
+        if slot_id == self.slot_manager.active_slot_index:
+            self._sync_old_ui_from_active_slot()
+
+    @Slot(int, str)
+    def _on_multi_slot_com_change(self, slot_id: int, port: str) -> None:
+        """パネルのCOMポート変更."""
+        if self.slot_manager is None:
+            return
+
+        slot = self.slot_manager.slot(slot_id)
+        if slot is None:
+            return
+
+        slot.close_serial()
+        if port:
+            slot.open_serial(port)
+        self.logger.info(f"Slot {slot_id}: COM port changed to '{port}'")
+
+        # 設定保存
+        self._save_current_slot_configs()
+
+        # アクティブスロットなら旧UIにも反映
+        if slot_id == self.slot_manager.active_slot_index:
+            self._sync_old_ui_from_active_slot()
+
+    # ------------------------------------------------------------------
+    # レイアウト変更
+    # ------------------------------------------------------------------
+
+    @Slot(str)
+    def _on_multi_slot_layout_changed(self, mode: str) -> None:
+        """レイアウト変更を設定に保存する."""
+        settings = self.setting.setting
+        if settings is not None:
+            settings["multi_slot_layout"] = mode
+        self.logger.debug(f"Layout changed to {mode}")
+
+    # ------------------------------------------------------------------
+    # SlotManager シグナル → パネルステータス更新
+    # ------------------------------------------------------------------
+
+    @Slot(int, bool, str)
+    def _on_slot_serial_state_for_panel(
+        self,
+        slot_id: int,
+        opened: bool,
+        label: str,
+    ) -> None:
+        """スロットのシリアル状態をパネルに反映する."""
+        if not hasattr(self, "multi_slot_view"):
+            return
+        panel = self.multi_slot_view.panel(slot_id)
+        if panel is not None:
+            panel.set_serial_status(opened, label)
+
+    @Slot(int, str)
+    def _on_slot_command_started_for_panel(self, slot_id: int, name: str) -> None:
+        """コマンド開始をパネルに反映する."""
+        if not hasattr(self, "multi_slot_view"):
+            return
+        panel = self.multi_slot_view.panel(slot_id)
+        if panel is not None:
+            panel.set_command_status(running=True, name=name)
+
+    @Slot(int, bool)
+    def _on_slot_command_stopped_for_panel(self, slot_id: int, result: bool) -> None:
+        """コマンド停止をパネルに反映する."""
+        if not hasattr(self, "multi_slot_view"):
+            return
+        panel = self.multi_slot_view.panel(slot_id)
+        if panel is not None:
+            panel.set_command_status(running=False)
+
+    # ------------------------------------------------------------------
+    # ヘルパー
+    # ------------------------------------------------------------------
+
+    def _save_current_slot_configs(self) -> None:
+        """現在のスロット設定を settings.toml に保存する."""
+        if self.slot_manager is None:
+            return
+
+        configs = [s.config for s in self.slot_manager.slots]
+        self.setting.save_slot_configs(configs)
+
+    def _update_active_frame_img(self) -> None:
+        """後方互換: アクティブスロットの最新フレームを self.img に反映する.
+
+        既存の render_latest_preview を以下に置き換え可能:
+
+            def render_latest_preview(self) -> None:
+                self._update_active_frame_img()
+
+        MultiSlotView がプレビュー描画を担当するため、
+        self.img (ピクセル座標取得用) の更新のみ行う。
+        """
+        if self.frame_store is None:
+            return
+
+        image, seq = self.frame_store.get_preview_if_new(self._last_preview_seq)
+        if image is None:
+            return
+
+        self._last_preview_seq = seq
+        self.img = image
+
+    def setup_multi_slot_view(self) -> None:
+        """MultiSlotView を生成し、既存の CaptureImageArea を置換する.
+
+        呼び出し位置: __init__ 内 — connect_slot_manager() の直後
+        """
+        import logging
+        from PySide6.QtWidgets import QGridLayout, QSizePolicy
+        from PySide6.QtCore import Qt
+        from libs.multi_slot_view import MultiSlotView
+
+        logger = logging.getLogger(__name__)
+
+        self.multi_slot_view = MultiSlotView(parent=self)
+        self.multi_slot_view.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding,
+        )
+        # CaptureImageArea の min/max 制約を引き継がない
+        self.multi_slot_view.setMinimumSize(0, 0)
+        self.multi_slot_view.setMaximumSize(16777215, 16777215)
+
+        # ---- gridLayout_4 を直接取得 ----
+        # main_ui.py (Designer 生成) で CaptureImageArea は
+        # gridLayout_4[row=2, col=0] に AlignHCenter|AlignVCenter 付きで配置されている。
+        # parent.layout() → gridLayout_7 であり、indexOf(CaptureImageArea) は -1 になる。
+        grid4 = self.centralwidget.findChild(QGridLayout, "gridLayout_4")
+
+        if grid4 is not None:
+            logger.info(
+                "setup_multi_slot_view: Found gridLayout_4, "
+                "replacing CaptureImageArea at row=2"
+            )
+
+            # 旧ウィジェットを除去
+            grid4.removeWidget(self.CaptureImageArea)
+            self.CaptureImageArea.hide()
+            self.CaptureImageArea.setParent(None)
+
+            # ★ アライメントフラグなしで追加 — セル全体を埋める
+            grid4.addWidget(self.multi_slot_view, 2, 0, 1, 1)
+
+            # ★ row=2 にストレッチを設定 — 残り全スペースを割り当て
+            grid4.setRowStretch(2, 1)
+            # 他の行 (frame_2=row1, frame=row3) はストレッチ 0 のまま → 固定高さ
+
+            logger.info(
+                "setup_multi_slot_view: MultiSlotView placed at gridLayout_4[2,0], "
+                "rowStretch(2)=1"
+            )
+        else:
+            # フォールバック: gridLayout_4 が見つからない場合
+            logger.warning(
+                "setup_multi_slot_view: gridLayout_4 not found, "
+                "falling back to parent layout replacement"
+            )
+            parent_widget = self.CaptureImageArea.parentWidget()
+            layout = parent_widget.layout() if parent_widget else None
+
+            if layout is not None:
+                layout.replaceWidget(self.CaptureImageArea, self.multi_slot_view)
+                self.CaptureImageArea.hide()
+                self.CaptureImageArea.setParent(None)
+            else:
+                self.CaptureImageArea.hide()
+                self.multi_slot_view.setParent(
+                    parent_widget if parent_widget else self,
+                )
+
+        # ---- パネル初期化 ----
+        if self.slot_manager is not None:
+            self.multi_slot_view.setup_panels(
+                self.slot_manager.slots,
+                self.slot_manager.active_slot_index,
+            )
+
+        # ---- カメラ一覧をパネルに反映 ----
+        if hasattr(self, "camera_list") and self.camera_list:
+            self.multi_slot_view.set_camera_list_all(self.camera_list)
+            self.multi_slot_view.sync_slot_devices(self.slot_manager.slots)
+
+        # ---- レイアウト復元 ----
+        settings = self.setting.setting
+        if settings is not None:
+            layout_mode = settings.get("multi_slot_layout", "single")
+            self.multi_slot_view.set_layout_mode(layout_mode)
+
+        # ---- MultiSlotView シグナル接続 ----
+        self.multi_slot_view.active_slot_changed.connect(
+            self._on_multi_slot_active_changed,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        self.multi_slot_view.layout_mode_changed.connect(
+            self._on_multi_slot_layout_changed,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        self.multi_slot_view.slot_start_requested.connect(
+            self._on_multi_slot_start,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        self.multi_slot_view.slot_stop_requested.connect(
+            self._on_multi_slot_stop,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        self.multi_slot_view.camera_change_requested.connect(
+            self._on_multi_slot_camera_change,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        self.multi_slot_view.com_port_change_requested.connect(
+            self._on_multi_slot_com_change,
+            Qt.ConnectionType.QueuedConnection,
+        )
+
+        # ---- SlotManager シグナル → パネルステータス更新 ----
+        if self.slot_manager is not None:
+            self.slot_manager.slot_serial_state_changed.connect(
+                self._on_slot_serial_state_for_panel,
+                Qt.ConnectionType.QueuedConnection,
+            )
+            self.slot_manager.slot_command_started.connect(
+                self._on_slot_command_started_for_panel,
+                Qt.ConnectionType.QueuedConnection,
+            )
+            self.slot_manager.slot_command_stopped.connect(
+                self._on_slot_command_stopped_for_panel,
+                Qt.ConnectionType.QueuedConnection,
+            )
+
+        # ---- プレビュー開始 ----
+        self.multi_slot_view.start_preview()
+
     # ------------------------------------------------------------------
     # shutdown
     # ------------------------------------------------------------------
@@ -2002,6 +2532,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         settings["main_window"]["option"]["window_showMaximized"] = self.isMaximized()
         settings["command"]["py_command"] = self.comboBoxPython.currentText()
         settings["command"]["mcu_command"] = self.comboBox_MCU.currentText()
+        settings["command"]["visual_macro_command"] = (
+            self.comboBox_VisualMacro.currentText()
+        )
 
         if self.template_matching_support_tool is not None:
             self.template_matching_support_tool.close()
@@ -2017,6 +2550,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.request_gamepad_stop.emit()
 
         # 4-6. slot manager handles capture + serial stop + thread cleanup
+        if hasattr(self, "multi_slot_view"):
+            self.multi_slot_view.stop_preview()
+
         if self.slot_manager is not None:
             self.slot_manager.shutdown_all()
 

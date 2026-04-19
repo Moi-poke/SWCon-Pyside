@@ -87,6 +87,10 @@ class VisualMacroEditorWidget(QWidget):
         index_path: Path = self._ui_dir / "index.html"
         self._view.load(QUrl.fromLocalFile(str(index_path.resolve())))
 
+    def set_startup_document_path(self, path: str) -> None:
+        """Set the document path to open when the editor finishes initializing."""
+        self._bridge.set_startup_document_path(path)
+
     def _setup_ui(self) -> None:
         """Create the internal widget layout."""
         layout: QVBoxLayout = QVBoxLayout(self)

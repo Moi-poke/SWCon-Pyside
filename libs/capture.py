@@ -1,3 +1,14 @@
+"""CaptureWorker — カメラキャプチャ + プレビュー生成.
+
+use_subprocess=True の場合:
+    CameraProcess (別プロセス) がカメラを開き、
+    共有メモリ経由でフレームを受け取る。
+    → DirectShow のマルチカメラ問題を回避。
+
+use_subprocess=False の場合 (従来モード):
+    CaptureWorker が直接 cv2.VideoCapture でカメラを開く。
+    → シングルカメラ環境向け。
+"""
 from __future__ import annotations
 
 import logging
@@ -41,6 +52,7 @@ class CaptureWorker(QObject):
         fps: int = 60,
         camera_id: int = 0,
         frame_store: Optional[FrameStore] = None,
+        use_subprocess: bool = False,
     ) -> None:
         super().__init__(parent)
 
@@ -62,6 +74,14 @@ class CaptureWorker(QObject):
         self._frame_stream_enabled: bool = False
         self._frame_store = frame_store
 
+        # ---- サブプロセスモード ----
+        self._use_subprocess = use_subprocess
+        self._camera_process: Optional["CameraProcess"] = None
+
+    # ================================================================
+    # Lifecycle
+    # ================================================================
+
     @Slot()
     def run(self) -> None:
         """Compatibility entry point."""
@@ -74,21 +94,38 @@ class CaptureWorker(QObject):
             self._timer.setTimerType(Qt.TimerType.PreciseTimer)
             self._timer.timeout.connect(self._capture_once)
 
-        if not self._open_camera_impl(self.camera_id):
-            self._running = False
-            return
+        if self._use_subprocess:
+            # ---- サブプロセスモード ----
+            if not self._start_camera_process():
+                self._running = False
+                return
+        else:
+            # ---- 直接モード (従来) ----
+            if not self._open_camera_impl(self.camera_id):
+                self._running = False
+                return
 
         self._running = True
         self._timer.setInterval(max(1, int(round(1000 / max(self.fps, 1)))))
         self._timer.start()
-        self.info(f"Capture started. camera_id={self.camera_id}, fps={self.fps}")
+
+        mode = "subprocess" if self._use_subprocess else "direct"
+        self.info(
+            f"Capture started. camera_id={self.camera_id}, "
+            f"fps={self.fps}, mode={mode}"
+        )
 
     @Slot()
     def stop_capture(self) -> None:
         self._running = False
         if self._timer is not None:
             self._timer.stop()
-        self._release_camera()
+
+        if self._use_subprocess:
+            self._stop_camera_process()
+        else:
+            self._release_camera()
+
         self.info("Capture stopped.")
 
     def stop(self) -> None:
@@ -97,22 +134,23 @@ class CaptureWorker(QObject):
     def wait(self) -> None:
         return None
 
+    # ================================================================
+    # Frame capture
+    # ================================================================
+
     @Slot()
     def _capture_once(self) -> None:
         if not self._running:
             return
 
-        camera = self._camera
-        if camera is None or not camera.isOpened():
-            self.warning("Camera is not opened.")
+        if self._use_subprocess:
+            latest = self._read_subprocess_frame()
+        else:
+            latest = self._read_direct_frame()
+
+        if latest is None:
             return
 
-        ok, frame = camera.read()
-        if not ok or frame is None:
-            self.warning("Failed to read frame from camera.")
-            return
-
-        latest = frame.copy()
         self._set_latest_frame(latest)
 
         try:
@@ -129,18 +167,86 @@ class CaptureWorker(QObject):
             if self._frame_stream_enabled:
                 self._frame_store.set_raw(latest)
 
+    def _read_direct_frame(self) -> Optional[np.ndarray]:
+        """直接モード: cv2.VideoCapture から読み取り."""
+        camera = self._camera
+        if camera is None or not camera.isOpened():
+            self.warning("Camera is not opened.")
+            return None
+
+        ok, frame = camera.read()
+        if not ok or frame is None:
+            self.warning("Failed to read frame from camera.")
+            return None
+
+        return frame.copy()
+
+    def _read_subprocess_frame(self) -> Optional[np.ndarray]:
+        """サブプロセスモード: 共有メモリから読み取り."""
+        if self._camera_process is None:
+            return None
+
+        frame = self._camera_process.read_frame()
+        return frame  # None or np.ndarray
+
+    # ================================================================
+    # Camera subprocess management
+    # ================================================================
+
+    def _start_camera_process(self) -> bool:
+        """CameraProcess を起動する."""
+        from libs.camera_process import CameraProcess
+
+        self._stop_camera_process()
+
+        self._camera_process = CameraProcess(
+            camera_id=self.camera_id,
+            width=self.width,
+            height=self.height,
+            fps=self.fps,
+        )
+        success = self._camera_process.start()
+        if not success:
+            self.error(
+                f"CameraProcess failed to start for camera_id={self.camera_id}"
+            )
+            self._camera_process = None
+            return False
+
+        self.debug(
+            f"CameraProcess started for camera_id={self.camera_id}"
+        )
+        return True
+
+    def _stop_camera_process(self) -> None:
+        """CameraProcess を停止する."""
+        if self._camera_process is not None:
+            self._camera_process.stop()
+            self._camera_process = None
+
+    # ================================================================
+    # Camera direct management (従来モード)
+    # ================================================================
+
     @Slot(int)
     def reopen_camera(self, camera_id: int) -> None:
         self.info(f"Reopen camera requested. new_camera_id={camera_id}")
         self.camera_id = int(camera_id)
-        self._release_camera()
-        self._open_camera_impl(self.camera_id)
+
+        if self._use_subprocess:
+            # サブプロセスを再起動
+            self._stop_camera_process()
+            self._start_camera_process()
+        else:
+            self._release_camera()
+            self._open_camera_impl(self.camera_id)
 
     def open_camera(self, camera_id: int) -> bool:
         self.camera_id = int(camera_id)
         return self._open_camera_impl(self.camera_id)
 
     def _open_camera_impl(self, camera_id: int) -> bool:
+        """直接モード: カメラを開く."""
         if self._camera is not None and self._camera.isOpened():
             self.debug("Camera is already opened. Releasing before reopen.")
             self._release_camera()
@@ -174,7 +280,16 @@ class CaptureWorker(QObject):
         self.fps = max(int(fps), 1)
         if self._timer is not None:
             self._timer.setInterval(max(1, int(round(1000 / self.fps))))
+
+        # サブプロセス側のFPSも更新
+        if self._camera_process is not None:
+            self._camera_process.set_fps(self.fps)
+
         self.debug(f"Capture FPS set to {self.fps}")
+
+    # ================================================================
+    # Frame storage
+    # ================================================================
 
     def _set_latest_frame(self, frame: np.ndarray) -> None:
         with QMutexLocker(self._frame_lock):
@@ -185,6 +300,10 @@ class CaptureWorker(QObject):
             if self._latest_frame is None:
                 return None
             return self._latest_frame.copy()
+
+    # ================================================================
+    # Rect overlay
+    # ================================================================
 
     @Slot(tuple, tuple, object, int)
     def add_rect(self, t1: tuple, t2: tuple, color: object, frames: int = 120) -> None:
@@ -253,6 +372,10 @@ class CaptureWorker(QObject):
                 painter.end()
 
         return image
+
+    # ================================================================
+    # Streaming / save
+    # ================================================================
 
     @Slot(bool)
     def set_frame_stream_enabled(self, enabled: bool) -> None:
@@ -347,7 +470,12 @@ class CaptureWorker(QObject):
         if frame is not None:
             self.send_img.emit(frame.copy())
 
+    # ================================================================
+    # Cleanup
+    # ================================================================
+
     def destroy(self) -> None:
+        self._stop_camera_process()
         self._release_camera()
 
     def _release_camera(self) -> None:
@@ -357,9 +485,13 @@ class CaptureWorker(QObject):
             try:
                 if camera.isOpened():
                     camera.release()
-                    self.debug("Camera destroyed")
+                self.debug("Camera destroyed")
             except Exception as exc:
                 self.warning(f"Camera release raised exception: {exc}")
+
+    # ================================================================
+    # Logging
+    # ================================================================
 
     def _emit_log(self, level: int, message: str) -> None:
         msg = f"thread id={threading.get_ident()} {message}"

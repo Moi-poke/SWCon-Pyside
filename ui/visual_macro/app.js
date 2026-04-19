@@ -25,6 +25,9 @@ let _roiTargetBlockId = null;
 /** Template image natural size for minimum ROI enforcement. */
 let _roiTemplateSize = null;
 
+/** Suppress document state notifications until editor init is complete. */
+let _notifyReady = false;
+
 /** Current drag mode: 'new' | 'move' | 'handle-nw' | ... | null */
 let _roiDragMode = null;
 
@@ -119,6 +122,7 @@ function bridgeCall(methodName, args = []) {
 }
 
 function notifyDocumentState() {
+  if (!_notifyReady) return;
   if (bridge && typeof bridge.update_document_state === "function") {
     bridge.update_document_state(currentDocumentPath, isDocumentModified);
   }
@@ -664,7 +668,7 @@ async function initializeBlockly() {
   });
 
   refreshProgramJson();
-  markCurrentDocumentAsClean(getFilePathInput().value.trim());
+  markCurrentDocumentAsClean("");
 }
 
 // ── ROI Modal ──
@@ -1419,6 +1423,25 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
 
     refreshRecentFilesUi();
+
+    // Restore the last-opened document from settings
+    if (bridge) {
+      try {
+        const startupPath = await bridgeCall("get_startup_document_path");
+        if (startupPath) {
+          await openDocumentByPath(startupPath, {
+            confirmDiscard: false,
+            updateRecent: false,
+          });
+        }
+      } catch (err) {
+        console.warn("[VisualMacro] Failed to restore startup document:", err);
+      }
+    }
+
+    // Enable document state notifications and send initial state
+    _notifyReady = true;
+    notifyDocumentState();
     updateEditorCaption();
   } catch (error) {
     console.error("[VisualMacro] Initialization failed:", error);

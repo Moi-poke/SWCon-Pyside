@@ -36,6 +36,7 @@ class VisualMacroBridge(QObject):
         self._visual_macro_dir: Path = visual_macro_dir
         self._template_service: TemplateService = template_service or TemplateService()
         self._visual_macro_dir.mkdir(parents=True, exist_ok=True)
+        self._startup_document_path: str = ""
 
     # ------------------------------------------------------------------
     # Template list
@@ -63,6 +64,15 @@ class VisualMacroBridge(QObject):
     def update_document_state(self, relative_path: str, modified: bool) -> None:
         """Update the current editor document state."""
         self.document_state_changed.emit(relative_path, modified)
+
+    def set_startup_document_path(self, path: str) -> None:
+        """Set the document path to open when the editor finishes initializing."""
+        self._startup_document_path = path
+
+    @Slot(result=str)
+    def get_startup_document_path(self) -> str:
+        """Return the startup document path (called once from JS on init)."""
+        return self._startup_document_path
 
     # ------------------------------------------------------------------
     # Load / Save
