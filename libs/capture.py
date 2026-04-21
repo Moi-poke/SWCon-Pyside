@@ -9,6 +9,7 @@ use_subprocess=False の場合 (従来モード):
     CaptureWorker が直接 cv2.VideoCapture でカメラを開く。
     → シングルカメラ環境向け。
 """
+
 from __future__ import annotations
 
 import logging
@@ -98,21 +99,22 @@ class CaptureWorker(QObject):
             # ---- サブプロセスモード ----
             if not self._start_camera_process():
                 self._running = False
+                # ★ CHANGED: 失敗してもタイマーは起動する (reopen で復帰可能にする)
+                self._ensure_timer_running()
                 return
         else:
             # ---- 直接モード (従来) ----
             if not self._open_camera_impl(self.camera_id):
                 self._running = False
+                # ★ CHANGED: 失敗してもタイマーは起動する
+                self._ensure_timer_running()
                 return
 
         self._running = True
-        self._timer.setInterval(max(1, int(round(1000 / max(self.fps, 1)))))
-        self._timer.start()
-
+        self._ensure_timer_running()
         mode = "subprocess" if self._use_subprocess else "direct"
         self.info(
-            f"Capture started. camera_id={self.camera_id}, "
-            f"fps={self.fps}, mode={mode}"
+            f"Capture started. camera_id={self.camera_id}, fps={self.fps}, mode={mode}"
         )
 
     @Slot()
@@ -133,6 +135,19 @@ class CaptureWorker(QObject):
 
     def wait(self) -> None:
         return None
+
+    # ================================================================
+    # Timer helper ★ NEW
+    # ================================================================
+    def _ensure_timer_running(self) -> None:
+        """タイマーが存在しなければ作成し、動いていなければ起動する."""
+        if self._timer is None:
+            self._timer = QTimer(self)
+            self._timer.setTimerType(Qt.TimerType.PreciseTimer)
+            self._timer.timeout.connect(self._capture_once)
+        self._timer.setInterval(max(1, int(round(1000 / max(self.fps, 1)))))
+        if not self._timer.isActive():
+            self._timer.start()
 
     # ================================================================
     # Frame capture
@@ -207,15 +222,11 @@ class CaptureWorker(QObject):
         )
         success = self._camera_process.start()
         if not success:
-            self.error(
-                f"CameraProcess failed to start for camera_id={self.camera_id}"
-            )
+            self.error(f"CameraProcess failed to start for camera_id={self.camera_id}")
             self._camera_process = None
             return False
 
-        self.debug(
-            f"CameraProcess started for camera_id={self.camera_id}"
-        )
+        self.debug(f"CameraProcess started for camera_id={self.camera_id}")
         return True
 
     def _stop_camera_process(self) -> None:
@@ -230,16 +241,30 @@ class CaptureWorker(QObject):
 
     @Slot(int)
     def reopen_camera(self, camera_id: int) -> None:
+        """カメラを再オープンする.  ★ CHANGED: 成功時にタイマー復帰."""
         self.info(f"Reopen camera requested. new_camera_id={camera_id}")
         self.camera_id = int(camera_id)
 
         if self._use_subprocess:
             # サブプロセスを再起動
             self._stop_camera_process()
-            self._start_camera_process()
+            success = self._start_camera_process()
         else:
             self._release_camera()
-            self._open_camera_impl(self.camera_id)
+            success = self._open_camera_impl(self.camera_id)
+
+        if success:
+            self._running = True
+            self._ensure_timer_running()
+            mode = "subprocess" if self._use_subprocess else "direct"
+            self.info(
+                f"Camera reopened successfully. camera_id={camera_id}, mode={mode}"
+            )
+        else:
+            # ★ カメラ失敗でも _running=False のまま、タイマーは維持
+            # → 次の reopen_camera() で復帰可能
+            self._running = False
+            self.error(f"Camera reopen failed for camera_id={camera_id}")
 
     def open_camera(self, camera_id: int) -> bool:
         self.camera_id = int(camera_id)

@@ -1,7 +1,6 @@
 """SessionSlot - 1台の Switch 操作に必要なリソースを束ねるスロット."""
 
 from __future__ import annotations
-
 import logging
 from typing import Any, Optional
 
@@ -30,6 +29,17 @@ class SessionSlot(QObject):
     serial_state_changed = Signal(int, bool, str)
     highlight_block = Signal(int, str)
     clear_block_highlight = Signal(int)
+
+    # ---- ワーカーへの操作用シグナル (スレッドセーフ) ---- ★ NEW
+    _sig_reopen_camera = Signal(int)
+    _sig_set_fps = Signal(int)
+    _sig_stop_capture = Signal()
+    _sig_set_frame_stream = Signal(bool)
+    _sig_open_serial = Signal(object, str)
+    _sig_close_serial = Signal()
+
+    _sig_save_capture = Signal(object, object, object, object, str)
+    _sig_add_rect = Signal(tuple, tuple, object, int)
 
     def __init__(
         self,
@@ -82,15 +92,15 @@ class SessionSlot(QObject):
 
         # ---- state ----
         self._serial_open: bool = False
-        self._started: bool = False  # ★ NEW
+        self._started: bool = False
 
         # ---- signal wiring ----
         self._wire_signals()
+        self._wire_worker_commands()  # ★ NEW
 
     # ================================================================
     # Properties
     # ================================================================
-
     @property
     def slot_id(self) -> int:
         return self._slot_id
@@ -108,13 +118,12 @@ class SessionSlot(QObject):
         return self._serial_open
 
     @property
-    def is_started(self) -> bool:  # ★ NEW
+    def is_started(self) -> bool:
         return self._started
 
     # ================================================================
     # Lifecycle
     # ================================================================
-
     def build_session_controller(self, **extra_callbacks: Any) -> None:
         """CommandSessionController を構築する."""
         self.command_session = CommandSessionController(
@@ -126,7 +135,7 @@ class SessionSlot(QObject):
 
     def start(self) -> None:
         """スレッドを起動する."""
-        if self._started:  # ★ NEW
+        if self._started:
             logger.warning(
                 "Slot %d: already started, skipping",
                 self._slot_id,
@@ -135,7 +144,6 @@ class SessionSlot(QObject):
 
         self.capture_thread.started.connect(self.capture_worker.start_capture)
         self.capture_thread.finished.connect(self.capture_worker.deleteLater)
-
         self.serial_thread.started.connect(self.serial_worker.start)
         self.serial_thread.finished.connect(self.serial_worker.deleteLater)
 
@@ -145,11 +153,10 @@ class SessionSlot(QObject):
         if self._config.com_port:
             self.open_serial(self._config.com_port)
 
-        self._started = True  # ★ NEW
+        self._started = True
 
-    def activate_devices(self) -> None:  # ★ NEW
+    def activate_devices(self) -> None:
         """デバイス (カメラ・シリアル) を起動/再接続する.
-
         スレッドが未起動なら start() を呼ぶ。
         すでに起動済みなら、カメラの再オープンとシリアルの接続を行う。
         """
@@ -157,56 +164,42 @@ class SessionSlot(QObject):
             self.start()
             return
 
-        # カメラ再オープン
+        # ★ CHANGED: シグナル経由でスレッドセーフに操作
         if self._config.camera_id >= 0:
-            try:
-                self.capture_worker.reopen_camera(self._config.camera_id)
-            except Exception as exc:
-                logger.warning(
-                    "Slot %d: failed to reopen camera: %s",
-                    self._slot_id,
-                    exc,
-                )
+            self._sig_reopen_camera.emit(self._config.camera_id)
 
-        # シリアル再接続
         if self._config.com_port:
-            try:
-                self.open_serial(self._config.com_port)
-            except Exception as exc:
-                logger.warning(
-                    "Slot %d: failed to open serial: %s",
-                    self._slot_id,
-                    exc,
-                )
+            self._sig_open_serial.emit(self._config.com_port, "")
 
-    def deactivate_devices(self) -> None:  # ★ NEW
+    def deactivate_devices(self) -> None:
         """デバイス (カメラ・シリアル) を停止する (スレッドはそのまま)."""
-        try:
-            self.capture_worker.stop_capture()
-        except Exception:
-            pass
-        try:
-            self.serial_worker.close_port()
-        except Exception:
-            pass
+        # ★ CHANGED: シグナル経由
+        self._sig_stop_capture.emit()
+        self._sig_close_serial.emit()
 
     def shutdown(self, timeout_ms: int = 3000) -> None:
         """全リソースを安全に停止する."""
         logger.info("Slot %d: shutting down ...", self._slot_id)
+
         if self.command_session is not None:
             try:
                 self.command_session.stop_all()
             except Exception:
                 pass
+
+        # ★ CHANGED: シグナル経由で停止要求を送信
+        # quit() 前にキューされたイベントは処理される
         try:
-            self.capture_worker.stop_capture()
+            self._sig_stop_capture.emit()
         except Exception:
             pass
         try:
-            self.serial_worker.close_port()
+            self._sig_close_serial.emit()
         except Exception:
             pass
+
         self._frame_registry.unregister(self._slot_id)
+
         for thread in (self.capture_thread, self.serial_thread):
             thread.quit()
             if not thread.wait(timeout_ms):
@@ -216,39 +209,80 @@ class SessionSlot(QObject):
                     thread.objectName(),
                     timeout_ms,
                 )
-        self._started = False  # ★ NEW
+
+        self._started = False
 
     # ================================================================
-    # Camera
+    # Camera (スレッドセーフ — シグナル経由) ★ CHANGED
     # ================================================================
-
     def reopen_camera(self, camera_id: int) -> None:
         self._config.camera_id = camera_id
-        self.capture_worker.reopen_camera(camera_id)
+        self._sig_reopen_camera.emit(camera_id)
 
     def set_fps(self, fps: int) -> None:
         self._config.fps = fps
-        self.capture_worker.set_fps(fps)
+        self._sig_set_fps.emit(fps)
+
+    def set_frame_stream_enabled(self, enabled: bool) -> None:
+        """フレームストリーム有効/無効を切り替える."""
+        self._sig_set_frame_stream.emit(enabled)
 
     # ================================================================
-    # Serial
+    # Serial (スレッドセーフ — シグナル経由) ★ CHANGED
     # ================================================================
-
     def open_serial(self, port: str) -> None:
         self._config.com_port = port
-        self.serial_worker.open_port(port)
+        self._sig_open_serial.emit(port, "")
 
     def close_serial(self) -> None:
-        self.serial_worker.close_port()
+        self._sig_close_serial.emit()
 
     # ================================================================
-    # Internal — signal wiring
+    # Internal — worker command wiring ★ NEW
     # ================================================================
+    def _wire_worker_commands(self) -> None:
+        """操作シグナルをワーカーのスロットに QueuedConnection で接続する."""
+        self._sig_reopen_camera.connect(
+            self.capture_worker.reopen_camera,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        self._sig_set_fps.connect(
+            self.capture_worker.set_fps,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        self._sig_stop_capture.connect(
+            self.capture_worker.stop_capture,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        self._sig_set_frame_stream.connect(
+            self.capture_worker.set_frame_stream_enabled,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        self._sig_open_serial.connect(
+            self.serial_worker.open_port,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        self._sig_close_serial.connect(
+            self.serial_worker.close_port,
+            Qt.ConnectionType.QueuedConnection,
+        )
 
+        self._sig_save_capture.connect(
+            self.capture_worker.save_capture,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        self._sig_add_rect.connect(
+            self.capture_worker.add_rect,
+            Qt.ConnectionType.QueuedConnection,
+        )
+
+    # ================================================================
+    # Internal — signal wiring (変更なし)
+    # ================================================================
     def _wire_signals(self) -> None:
         sid = self._slot_id
-
         rt = self.command_runtime
+
         if hasattr(rt, "log"):
             rt.log.connect(
                 lambda msg, lvl, _s=sid: self.log_message.emit(_s, msg, lvl),
@@ -297,3 +331,16 @@ class SessionSlot(QObject):
     def _on_serial_state(self, slot_id: int, opened: bool, label: str) -> None:
         self._serial_open = opened
         self.serial_state_changed.emit(slot_id, opened, label)
+
+    def save_capture(
+        self,
+        filename=None,
+        crop=None,
+        crop_ax=None,
+        img=None,
+        capture_dir: str = "./ScreenShot",
+    ) -> None:
+        self._sig_save_capture.emit(filename, crop, crop_ax, img, capture_dir)
+
+    def add_rect(self, t1, t2, color, frames: int = 120) -> None:
+        self._sig_add_rect.emit(t1, t2, color, frames)

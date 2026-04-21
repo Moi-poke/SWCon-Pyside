@@ -58,15 +58,14 @@ Author = "Moi"
 
 
 class MainWindow(QMainWindow, Ui_MainWindow):
-    request_capture_reopen = Signal(int)
-    request_capture_set_fps = Signal(int)
-    request_capture_save = Signal(object, object, object, object, str)
-    request_capture_add_rect = Signal(tuple, tuple, object, int)
-    request_capture_stop = Signal()
-    request_capture_frame_stream = Signal(bool)
+    # request_capture_reopen = Signal(int)
+    # request_capture_set_fps = Signal(int)
+    # request_capture_save = Signal(object, object, object, object, str)
+    # request_capture_add_rect = Signal(tuple, tuple, object, int)
+    # request_capture_stop = Signal()
+    # request_capture_frame_stream = Signal(bool)
 
-    request_serial_open = Signal(object, str)
-    request_serial_close = Signal()
+    # ---- リアルタイム入力系 (アクティブスロットに直結) ----
     request_serial_write = Signal(str, bool)
     request_serial_keypress = Signal(object, float, float, object)
     request_serial_button_pressed = Signal(str)
@@ -74,6 +73,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     request_serial_axis = Signal(float, float, float, float)
     request_serial_show = Signal(bool)
 
+    # ---- ゲームパッド操作 (変更なし) ----
     request_gamepad_stop = Signal()
     request_gamepad_pause = Signal(bool)
     request_gamepad_reconnect = Signal()
@@ -217,7 +217,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         #             break
         self._sync_old_ui_from_active_slot()
 
-        self.activate_serial()
+        # self.activate_serial()
 
         self.preview_timer = QTimer(self)
         self.preview_timer.setTimerType(Qt.TimerType.PreciseTimer)
@@ -361,9 +361,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return dict(
                 logger=self.logger,
                 pause_gamepad=lambda paused: self.request_gamepad_pause.emit(paused),
-                set_frame_stream=lambda on: (
-                    slot.capture_worker.set_frame_stream_enabled(on)
-                ),
+                set_frame_stream=lambda on: slot.set_frame_stream_enabled(
+                    on
+                ),  # ★ CHANGED: SessionSlot経由
                 sync_buttons=lambda: self._sync_command_buttons(),
                 play_mcu_callback=self.play_mcu,
             )
@@ -388,93 +388,90 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.command_session = active.command_session
         self.gui_stick_store = active.gui_stick_store
 
-        # ---- capture worker 接続 ----
-        self.capture_worker.log.connect(
-            self.callback_string_to_log,
-            type=Qt.ConnectionType.QueuedConnection,
-        )
-        self.request_capture_reopen.connect(
-            self.capture_worker.reopen_camera,
-            type=Qt.ConnectionType.QueuedConnection,
-        )
-        self.request_capture_set_fps.connect(
-            self.capture_worker.set_fps,
-            type=Qt.ConnectionType.QueuedConnection,
-        )
-        self.request_capture_save.connect(
-            self.capture_worker.save_capture,
-            type=Qt.ConnectionType.QueuedConnection,
-        )
-        self.request_capture_add_rect.connect(
-            self.capture_worker.add_rect,
-            type=Qt.ConnectionType.QueuedConnection,
-        )
-        self.request_capture_stop.connect(
-            self.capture_worker.stop_capture,
-            type=Qt.ConnectionType.QueuedConnection,
-        )
-        self.request_capture_frame_stream.connect(
-            self.capture_worker.set_frame_stream_enabled,
-            type=Qt.ConnectionType.QueuedConnection,
-        )
+        # ★ CHANGED: ヘルパーに一括委譲
+        self._connect_active_worker_signals()
 
-        # ---- serial worker 接続 ----
-        self.request_serial_open.connect(
-            self.serial_worker.open_port, Qt.ConnectionType.QueuedConnection
-        )
-        self.request_serial_close.connect(
-            self.serial_worker.close_port, Qt.ConnectionType.QueuedConnection
-        )
-        self.request_serial_write.connect(
-            self.serial_worker.write_row, Qt.ConnectionType.QueuedConnection
-        )
-        self.request_serial_keypress.connect(
-            self.serial_worker.on_keypress, Qt.ConnectionType.QueuedConnection
-        )
-        self.request_serial_button_pressed.connect(
-            self.serial_worker.on_named_button_pressed,
-            Qt.ConnectionType.QueuedConnection,
-        )
-        self.request_serial_button_released.connect(
-            self.serial_worker.on_named_button_released,
-            Qt.ConnectionType.QueuedConnection,
-        )
-        self.request_serial_axis.connect(
-            self.serial_worker.on_axis_moved, Qt.ConnectionType.QueuedConnection
-        )
-        self.request_serial_show.connect(
-            self.serial_worker.set_show_serial, Qt.ConnectionType.QueuedConnection
-        )
-        self.serial_worker.log.connect(
-            self.callback_string_to_log, Qt.ConnectionType.QueuedConnection
-        )
-        self.serial_worker.serial_error.connect(
-            self.on_serial_error, Qt.ConnectionType.QueuedConnection
-        )
-        self.serial_worker.serial_state_changed.connect(
-            self.on_serial_state_changed, Qt.ConnectionType.QueuedConnection
-        )
+    # ================================================================
+    # アクティブスロット — シグナル接続管理 ★ NEW
+    # ================================================================
+    def _connect_active_worker_signals(self) -> None:
+        """アクティブスロットのワーカーに MainWindow のシグナルを接続する."""
+        cw = self.capture_worker
+        sw = self.serial_worker
+        rt = self.command_runtime
+        Q = Qt.ConnectionType.QueuedConnection
 
-        # ---- command runtime 接続 ----
-        self.command_runtime.log.connect(
-            self.callback_string_to_log, Qt.ConnectionType.QueuedConnection
-        )
-        self.command_runtime.started.connect(
-            self.on_command_started, Qt.ConnectionType.QueuedConnection
-        )
-        self.command_runtime.stopped.connect(
-            self.on_command_stopped, Qt.ConnectionType.QueuedConnection
-        )
-        if hasattr(self.command_runtime, "highlight_block_requested"):
-            self.command_runtime.highlight_block_requested.connect(
-                self._on_visual_macro_highlight_requested,
-                Qt.ConnectionType.QueuedConnection,
+        # ---- serial worker (リアルタイム入力) ----
+        self.request_serial_write.connect(sw.write_row, Q)
+        self.request_serial_keypress.connect(sw.on_keypress, Q)
+        self.request_serial_button_pressed.connect(sw.on_named_button_pressed, Q)
+        self.request_serial_button_released.connect(sw.on_named_button_released, Q)
+        self.request_serial_axis.connect(sw.on_axis_moved, Q)
+        self.request_serial_show.connect(sw.set_show_serial, Q)
+
+        # ---- worker → MainWindow 通知 ----
+        cw.log.connect(self.callback_string_to_log, Q)
+        sw.log.connect(self.callback_string_to_log, Q)
+        sw.serial_error.connect(self.on_serial_error, Q)
+        sw.serial_state_changed.connect(self.on_serial_state_changed, Q)
+
+        rt.log.connect(self.callback_string_to_log, Q)
+        rt.started.connect(self.on_command_started, Q)
+        rt.stopped.connect(self.on_command_stopped, Q)
+        if hasattr(rt, "highlight_block_requested"):
+            rt.highlight_block_requested.connect(
+                self._on_visual_macro_highlight_requested, Q
             )
-        if hasattr(self.command_runtime, "clear_block_highlight_requested"):
-            self.command_runtime.clear_block_highlight_requested.connect(
-                self._on_visual_macro_highlight_cleared,
-                Qt.ConnectionType.QueuedConnection,
+        if hasattr(rt, "clear_block_highlight_requested"):
+            rt.clear_block_highlight_requested.connect(
+                self._on_visual_macro_highlight_cleared, Q
             )
+
+    def _disconnect_active_worker_signals(self) -> None:
+        """旧アクティブスロットのワーカーとの接続を切断する."""
+        cw = self.capture_worker
+        sw = self.serial_worker
+        rt = self.command_runtime
+
+        if cw is None or sw is None or rt is None:
+            return
+
+        pairs = [
+            (self.request_serial_write, sw.write_row),
+            (self.request_serial_keypress, sw.on_keypress),
+            (self.request_serial_button_pressed, sw.on_named_button_pressed),
+            (self.request_serial_button_released, sw.on_named_button_released),
+            (self.request_serial_axis, sw.on_axis_moved),
+            (self.request_serial_show, sw.set_show_serial),
+            (cw.log, self.callback_string_to_log),
+            (sw.log, self.callback_string_to_log),
+            (sw.serial_error, self.on_serial_error),
+            (sw.serial_state_changed, self.on_serial_state_changed),
+            (rt.log, self.callback_string_to_log),
+            (rt.started, self.on_command_started),
+            (rt.stopped, self.on_command_stopped),
+        ]
+        for signal, slot in pairs:
+            try:
+                signal.disconnect(slot)
+            except (RuntimeError, TypeError):
+                pass
+
+        # optional signals
+        if hasattr(rt, "highlight_block_requested"):
+            try:
+                rt.highlight_block_requested.disconnect(
+                    self._on_visual_macro_highlight_requested
+                )
+            except (RuntimeError, TypeError):
+                pass
+        if hasattr(rt, "clear_block_highlight_requested"):
+            try:
+                rt.clear_block_highlight_requested.disconnect(
+                    self._on_visual_macro_highlight_cleared
+                )
+            except (RuntimeError, TypeError):
+                pass
 
     @Slot()
     def render_latest_preview(self) -> None:
@@ -1200,10 +1197,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     # ------------------------------------------------------------------
     def setup_functions_connect(self) -> None:
         self.pushButtonReloadCamera.pressed.connect(
-            # lambda: self.reconnect_camera(self.lineEditCameraID.text())
             self._on_reload_camera_for_active_slot
         )
-        self.pushButtonReloadCamera.pressed.connect(self.reload_camera)
 
         self.pushButtonClearLog.pressed.connect(self.plainTextEdit.widget.clear)
 
@@ -1411,8 +1406,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         settings = self.setting.setting
         if settings is None:
             raise RuntimeError("Settings are not loaded.")
-        self.request_serial_close.emit()
-        self.request_serial_open.emit(settings["main_window"]["must"]["com_port"], "")
+        # ★ CHANGED: SessionSlot 経由 (スレッドセーフ)
+        if self.slot_manager is None:
+            return
+        active = self.slot_manager.active_slot
+        if active is None:
+            return
+
+        # スロット設定のポートを使用 (旧 legacy 設定は参照しない)
+        active.close_serial()
+        if active.config.com_port:
+            active.open_serial(active.config.com_port)
 
     def on_serial_state_changed(self, opened: bool, label: str) -> None:
         self._serial_open = opened
@@ -1425,8 +1429,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.logger.error(message)
 
     def reconnect_camera(self, cam_id: str) -> None:
+        # ★ CHANGED: SessionSlot 経由
+        if self.slot_manager is None:
+            return
+        active = self.slot_manager.active_slot
+        if active is None:
+            return
         try:
-            self.request_capture_reopen.emit(int(cam_id))
+            active.reopen_camera(int(cam_id))
         except ValueError:
             self.logger.error(f"Invalid camera id: {cam_id}")
 
@@ -1434,10 +1444,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         settings = self.setting.setting
         if settings is None:
             raise RuntimeError("Settings are not loaded.")
+        # ★ CHANGED: SessionSlot 経由
+        if self.slot_manager is None:
+            return
+        active = self.slot_manager.active_slot
+        if active is None:
+            return
         try:
-            self.request_capture_set_fps.emit(
-                int(settings["main_window"]["must"]["fps"])
-            )
+            active.set_fps(int(settings["main_window"]["must"]["fps"]))
         except Exception as exc:
             self.logger.error(exc)
 
@@ -1456,11 +1470,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         settings = self.setting.setting
         if settings is None:
             raise RuntimeError("Settings are not loaded.")
-
         enabled = self.actionShow_Serial.isChecked()
         settings["main_window"]["option"]["show_serial"] = enabled
         self.is_show_serial = enabled
-        self.request_serial_show.emit(enabled)
+        self.request_serial_show.emit(enabled)  # ← これはリアルタイム系なので残す
 
     # ------------------------------------------------------------------
     # commands
@@ -1947,7 +1960,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 if self.cur_command is not None
                 else "./ScreenShot"
             )
-            self.request_capture_save.emit(None, None, None, None, capture_dir)
+            if (
+                self.slot_manager is not None
+                and self.slot_manager.active_slot is not None
+            ):
+                self.slot_manager.active_slot.save_capture(capture_dir=capture_dir)
         except Exception as exc:
             self.logger.error(exc)
 
@@ -2054,12 +2071,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self.slot_manager is None:
             return
 
+        # ★ 1. 旧アクティブスロットとの接続を切断
+        self._disconnect_active_worker_signals()
+
         self.slot_manager.set_active_slot(slot_id)
         active = self.slot_manager.active_slot
         if active is None:
             return
 
-        # 後方互換参照の再配線
+        # ★ 2. 後方互換参照の再配線
         self.frame_store = active.frame_store
         self.capture_worker = active.capture_worker
         self.capture_thread = active.capture_thread
@@ -2069,11 +2089,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.command_session = active.command_session
         self.gui_stick_store = active.gui_stick_store
 
+        # ★ 3. 新アクティブスロットに接続
+        self._connect_active_worker_signals()
+
         # 旧UIの表示をアクティブスロットに同期
         self._sync_old_ui_from_active_slot()
 
         # ゲームパッドルーティング先を更新
         self._sync_command_buttons()
+
+        # シリアル状態を同期
+        self._serial_open = active.is_serial_open
 
         # 設定に保存
         settings = self.setting.setting
@@ -2584,6 +2610,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # 3. gamepad stop
         self.request_gamepad_pause.emit(True)
         self.request_gamepad_stop.emit()
+
+        # ★ 3.5. アクティブスロットのシグナル接続を切断
+        self._disconnect_active_worker_signals()
 
         # 4-6. slot manager handles capture + serial stop + thread cleanup
         if hasattr(self, "multi_slot_view"):
