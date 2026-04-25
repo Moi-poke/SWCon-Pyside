@@ -1,4 +1,5 @@
 import toml
+from typing import Any
 from libs.slot_config import MAX_SLOTS, SlotConfig
 
 DEFAULT_SETTINGS = {
@@ -22,7 +23,11 @@ DEFAULT_SETTINGS = {
         },
     },
     "line": {"token_1": ""},
-    "command": {"py_command": "A連打", "mcu_command": "A連打"},
+    "command": {
+        "py_command": "A連打",
+        "mcu_command": "A連打",
+        "visual_macro_command": "",
+    },
     "key_config": {
         "keyboard": {
             "button": {
@@ -150,6 +155,15 @@ class Setting:
         else:
             return False
 
+    @staticmethod
+    def _safe_int(value: Any, default: int) -> int:
+        """int() 変換に失敗したら default を返す."""
+        try:
+            rs = int(value)
+            return rs
+        except (ValueError, TypeError):
+            return default
+
     def save(self) -> bool:
         if self.setting is not None:
             with open(self.path, "w", encoding="utf-8") as setting:
@@ -164,6 +178,15 @@ class Setting:
 
     def _migrate(self) -> None:
         """旧フォーマット (単一 camera/com_port) -> slots 配列へ変換."""
+        if self.setting is None:
+            return
+
+        # ★ FIX A-3: command セクションにキーが不足していれば補完
+        cmd = self.setting.setdefault("command", {})
+        cmd.setdefault("py_command", "A連打")
+        cmd.setdefault("mcu_command", "A連打")
+        cmd.setdefault("visual_macro_command", "")
+
         if "slots" in self.setting:
             # 既に新フォーマット -> パディングだけ確認
             while len(self.setting["slots"]) < MAX_SLOTS:
@@ -177,13 +200,12 @@ class Setting:
         slot0 = {
             "enabled": True,
             "label": "Switch 1",
-            "camera_id": int(must.get("camera_id", 0)),
+            "camera_id": self._safe_int(must.get("camera_id", 0), 0),  # ★ FIX A-4
             "camera_name": str(must.get("camera_name", "")),
             "com_port": str(must.get("com_port", "")),
             "com_port_name": str(must.get("com_port_name", "")),
-            "fps": int(must.get("fps", 60)),
+            "fps": self._safe_int(must.get("fps", 60), 60),  # ★ FIX A-4
         }
-
         slots = [slot0]
         for i in range(1, MAX_SLOTS):
             slots.append(SlotConfig(slot_id=i).to_dict())

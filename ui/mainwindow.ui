@@ -758,6 +758,8 @@
      <addaction name="actionconnect"/>
      <addaction name="actionsetting"/>
      <addaction name="actionPauseController"/>
+     <addaction name="actionCalibrateStick"/>
+     <addaction name="actionEnableNSw2Hid"/>
     </widget>
     <addaction name="menuGUI_Controller_2"/>
     <addaction name="menuGamepad_Controller"/>
@@ -2227,6 +2229,22 @@
   <action name="actionTemplateMatchSupport">
    <property name="text">
     <string>Template Matching Support</string>
+   </property>
+  </action>
+  <action name="actionCalibrateStick">
+   <property name="text">
+    <string>スティックキャリブレーション</string>
+   </property>
+   <property name="toolTip">
+    <string>アナログスティックのセンター・可動域を自動補正</string>
+   </property>
+  </action>
+  <action name="actionEnableNSw2Hid">
+   <property name="text">
+    <string>NSw2 HID有効化</string>
+   </property>
+   <property name="toolTip">
+    <string>Switch 2 Pro Controller の HID入力を有効化</string>
    </property>
   </action>
  </widget>

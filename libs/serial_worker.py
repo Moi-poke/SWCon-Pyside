@@ -39,7 +39,7 @@ class SerialWorker(QObject):
         self._gamepad_axis = (0.0, 0.0, 0.0, 0.0)
         self._gui_left: Optional[Direction] = None
         self._gui_right: Optional[Direction] = None
-        self._dead_zone = 0.35
+        self._dead_zone = 0.0  # deadzone handled upstream (GamepadPoller); keep 0 here to avoid range shrink
 
         self._gui_stick_store = gui_stick_store
         self._poll_timer: Optional[QTimer] = None
@@ -307,14 +307,37 @@ class SerialWorker(QObject):
         horizontal: float,
         vertical: float,
     ) -> Optional[Direction]:
-        r = math.sqrt(horizontal**2 + vertical**2)
-        if r < self._dead_zone:
+        """Convert normalized axes (-1..+1) into a Direction using direct (x,y).
+
+        Notes
+        -----
+        - `horizontal`/`vertical` are expected to come from GamepadPoller.axis_changed.
+        - GamepadPoller already applies radial deadzone and any device-specific
+          calibration/correction (including NSw2 smart calibration).
+        - Here we avoid *any* rescaling that could shrink full-tilt values.
+
+        Coordinate conventions
+        ----------------------
+        - Internal convention: pygame-standard (UP is negative vertical).
+        - Direction protocol expects y=255 as UP, y=0 as DOWN.
+          Therefore y = round((-v) * 127.5 + 127.5).
+        """
+        # Optional tiny radial cutoff to ignore micro jitter.
+        r = math.sqrt(horizontal * horizontal + vertical * vertical)
+        if self._dead_zone > 0.0 and r < self._dead_zone:
             return None
 
-        normalized = (r - self._dead_zone) / (1.0 - self._dead_zone)
-        normalized = max(0.0, min(normalized, 1.0))
-        angle = -math.degrees(math.atan2(vertical, horizontal))
-        return Direction(stick, angle, normalized)
+        # Clamp to [-1, 1]
+        h = max(-1.0, min(1.0, float(horizontal)))
+        v = max(-1.0, min(1.0, float(vertical)))
+
+        # -1.0..+1.0 -> 0..255 (direct mapping, no polar roundtrip)
+        x = int(round(h * 127.5 + 127.5))
+        y = int(round((-v) * 127.5 + 127.5))
+        x = max(0, min(255, x))
+        y = max(0, min(255, y))
+
+        return Direction(stick, (x, y))
 
     def _name_to_input(self, name: str) -> Optional[Button | Hat]:
         button_map = {

@@ -24,6 +24,7 @@ from PySide6.QtGui import QCloseEvent, QColor, QImage, QPixmap, QResizeEvent, QA
 from PySide6.QtWidgets import (
     QApplication,
     QDockWidget,
+    QInputDialog,
     QMainWindow,
     QMessageBox,
     QWidget,
@@ -38,7 +39,7 @@ from libs.com_port_assist import serial_ports
 from libs.CommandBase import CommandBase
 from libs.CommandLoader import CommandLoader
 from libs.frame_store import FrameStore
-from libs.game_pad_connect import GamepadController
+from libs.game_pad_connect import GamepadPoller
 from libs.gui_stick_store import GuiStickStore
 from libs.keys import KeyPress
 from libs.mcu_command_base import McuCommand
@@ -73,14 +74,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     request_serial_axis = Signal(float, float, float, float)
     request_serial_show = Signal(bool)
 
-    # ---- ゲームパッド操作 (変更なし) ----
-    request_gamepad_stop = Signal()
-    request_gamepad_pause = Signal(bool)
-    request_gamepad_reconnect = Signal()
-    request_gamepad_set_keymap = Signal(object)
-    request_gamepad_set_l_stick = Signal(bool)
-    request_gamepad_set_r_stick = Signal(bool)
-
     def __init__(
         self,
         parent: Optional[QWidget] = None,
@@ -97,7 +90,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.serial_worker: Optional[SerialWorker] = None
 
         self.gamepad_thread: Optional[QThread] = None
-        self.gamepad_worker: Optional[GamepadController] = None
+        self.gamepad_worker: Optional[GamepadPoller] = None
 
         self.command_runtime: Optional[CommandRuntime] = None
         self.command_session: Optional[CommandSessionController] = None
@@ -299,53 +292,87 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     # ------------------------------------------------------------------
 
     def connect_gamepad(self) -> None:
-        self.gamepad_thread = QThread(self)
-        self.gamepad_worker = GamepadController()
-        self.gamepad_worker.moveToThread(self.gamepad_thread)
+        """GamepadPoller をメインスレッドの QTimer で動かす（QThread不要）"""
+        from libs.game_pad_connect import GamepadPoller
 
-        self.gamepad_thread.started.connect(self.gamepad_worker.run)
-        self.gamepad_thread.finished.connect(self.gamepad_worker.deleteLater)
+        self.gamepad_worker = GamepadPoller(self)  # parent=self → メインスレッド
 
-        self.request_gamepad_stop.connect(
-            self.gamepad_worker.stop, Qt.ConnectionType.QueuedConnection
-        )
-        self.request_gamepad_pause.connect(
-            self.gamepad_worker.set_pause, Qt.ConnectionType.QueuedConnection
-        )
-        self.request_gamepad_reconnect.connect(
-            self.gamepad_worker.connect_joystick, Qt.ConnectionType.QueuedConnection
-        )
+        self.gamepad_thread = None
 
-        self.request_gamepad_set_keymap.connect(
-            self.gamepad_worker.set_keymap,
-            Qt.ConnectionType.QueuedConnection,
-        )
-        self.request_gamepad_set_l_stick.connect(
-            self.gamepad_worker.set_l_stick,
-            Qt.ConnectionType.QueuedConnection,
-        )
-        self.request_gamepad_set_r_stick.connect(
-            self.gamepad_worker.set_r_stick,
-            Qt.ConnectionType.QueuedConnection,
-        )
-
+        # ---- Signal 接続 ----
         self.gamepad_worker.button_pressed.connect(
-            self.handle_gamepad_button_pressed, Qt.ConnectionType.QueuedConnection
+            self.handle_gamepad_button_pressed,
+            Qt.ConnectionType.DirectConnection,
         )
         self.gamepad_worker.button_released.connect(
-            self.handle_gamepad_button_released, Qt.ConnectionType.QueuedConnection
+            self.handle_gamepad_button_released,
+            Qt.ConnectionType.DirectConnection,
         )
-        self.gamepad_worker.axis_moved.connect(
-            self.handle_gamepad_axis_moved, Qt.ConnectionType.QueuedConnection
+        self.gamepad_worker.axis_changed.connect(
+            self.handle_gamepad_axis_moved,
+            Qt.ConnectionType.DirectConnection,
         )
         self.gamepad_worker.log.connect(
-            self.callback_string_to_log, Qt.ConnectionType.QueuedConnection
+            self.callback_string_to_log,
+            Qt.ConnectionType.DirectConnection,
+        )
+        # ---- キャリブレーション ----
+        self.gamepad_worker.calibration_progress.connect(
+            self._on_calibration_progress,
+            Qt.ConnectionType.DirectConnection,
+        )
+        self.gamepad_worker.calibration_finished.connect(
+            self._on_calibration_finished,
+            Qt.ConnectionType.DirectConnection,
         )
 
-        self.gamepad_thread.start()
-        self.request_gamepad_set_keymap.emit(self.keymap)
-        self.gamepad_l_stick()
-        self.gamepad_r_stick()
+        # keymap / stick 設定を直接セット（同一スレッドなので直接呼出OK）
+        if self.keymap:
+            self.keymap = self._build_keymap_from_settings()
+            self.gamepad_worker.set_keymap(self.keymap)
+        self.gamepad_worker.set_use_lstick(
+            bool(self.setting.setting["key_config"]["joystick"]["direction"]["LStick"])
+        )
+        self.gamepad_worker.set_use_rstick(
+            bool(self.setting.setting["key_config"]["joystick"]["direction"]["RStick"])
+        )
+
+        # ---- 前回使用したデバイスを自動選択 ----
+        settings = self.setting.setting
+        if settings is not None:
+            saved_name = settings.get("gamepad_device_name", "")
+            if saved_name:
+                if hasattr(self.gamepad_worker, "select_device_by_name"):
+                    self.gamepad_worker.select_device_by_name(saved_name)
+
+        # ポーリング開始
+        self.gamepad_worker.start()
+
+        # ★ Switch 2 Pro Controller の自動HID初期化
+        self._try_enable_nsw2_hid()
+
+        # gamepad_thread は不要になる
+        self.gamepad_thread = None
+
+    def _try_enable_nsw2_hid(self) -> None:
+        """NSw2 Pro Controller が接続されていればHIDを自動有効化."""
+
+        if self.gamepad_worker is None:
+            return
+
+        if self.gamepad_worker.enable_nsw2_hid():
+            import time
+
+            time.sleep(0.5)
+            self.gamepad_worker.reconnect()
+
+            # ✅ settings.toml のキーコンフィグから keymap を作って適用
+            self.keymap = self._build_keymap_from_settings()
+            self.gamepad_worker.set_keymap(self.keymap)
+
+            self.logger.info(
+                "Switch 2 Pro Controller: HID有効化 + settings.toml keymap適用完了"
+            )
 
     def connect_slot_manager(self) -> None:
         """SlotManager を生成し、全スロットを起動する."""
@@ -360,7 +387,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         def _session_ctrl_kwargs(slot):
             return dict(
                 logger=self.logger,
-                pause_gamepad=lambda paused: self.request_gamepad_pause.emit(paused),
+                pause_gamepad=lambda paused: (
+                    self.gamepad_worker.set_paused(paused)
+                    if self.gamepad_worker
+                    else None
+                ),
                 set_frame_stream=lambda on: slot.set_frame_stream_enabled(
                     on
                 ),  # ★ CHANGED: SessionSlot経由
@@ -1245,7 +1276,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.toolButtonOpenPythonDir.clicked.connect(self.open_python_shot_dir)
         self.toolButton_OpenMCUDir.clicked.connect(self.open_mcu_shot_dir)
         self.comboBoxCameraNames.currentIndexChanged.connect(
-            # self.handle_camera_selection_changed
             self._on_camera_combo_changed_for_active_slot
         )
         self.tabWidget.currentChanged.connect(self.set_command_mode)
@@ -1269,13 +1299,41 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         )
 
         self.actionconnect.triggered.connect(self.reconnect_gamepad)
+        self.actionPauseController.triggered.connect(self.pause_controller)
+
+        self.actionCalibrateStick.triggered.connect(self.start_stick_calibration)
+        self.actionEnableNSw2Hid.triggered.connect(lambda: self._try_enable_nsw2_hid())
+
         self.actionCOM_Port_ASSIST.triggered.connect(
             self.message_show_available_com_port
         )
         self.actionShow_Serial.triggered.connect(self.show_serial)
-        self.actionPauseController.triggered.connect(self.pause_controller)
-
         self._connect_controller_buttons()
+
+    # ── 新規メソッド ──
+    def start_stick_calibration(self) -> None:
+        """スティックキャリブレーション開始."""
+        if self.gamepad_worker is None:
+            return
+        if not self.gamepad_worker.is_connected:
+            QMessageBox.warning(
+                self, "Calibration", "ゲームパッドが接続されていません。"
+            )
+            return
+
+        self.gamepad_worker.start_calibration()
+
+    @Slot(str)
+    def _on_calibration_progress(self, msg: str) -> None:
+        self.logger.info(f"[Calibration] {msg}")
+
+    def _on_calibration_finished(self, result: dict) -> None:
+        """キャリブレーション結果を設定に保存."""
+        settings = self.setting.setting
+        if settings is not None:
+            settings["nsw2_stick_calibration"] = result
+        self.logger.info("スティックキャリブレーション結果を保存しました")
+        # 次回以降の自動復元は connect_gamepad() で行う
 
     def _connect_controller_buttons(self) -> None:
         mapping = {
@@ -1456,7 +1514,48 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.logger.error(exc)
 
     def reconnect_gamepad(self) -> None:
-        self.request_gamepad_reconnect.emit()
+        """ゲームパッド選択ダイアログを表示して接続."""
+        if self.gamepad_worker is None:
+            return
+
+        devices = self.gamepad_worker.enumerate_devices()
+
+        if not devices:
+            QMessageBox.information(self, "Gamepad", "ゲームパッドが見つかりません。")
+            return
+
+        if len(devices) == 1:
+            print(devices)
+            # 1台のみ → そのまま接続
+            self.gamepad_worker.select_device(devices[0][0])
+            self._save_gamepad_device_name(devices[0][1])
+            return
+
+        # 複数台 → 選択ダイアログ
+        items = [f"{idx}: {name}" for idx, name in devices]
+        item, ok = QInputDialog.getItem(
+            self,
+            "Gamepad",
+            "接続するゲームパッドを選択してください:",
+            items,
+            0,
+            False,
+        )
+        if not ok or not item:
+            # キャンセル → 元のデバイスに再接続を試みる
+            self.gamepad_worker.reconnect()
+            return
+
+        selected_index = devices[items.index(item)][0]
+        selected_name = devices[items.index(item)][1]
+        self.gamepad_worker.select_device(selected_index)
+        self._save_gamepad_device_name(selected_name)
+
+    def _save_gamepad_device_name(self, name: str) -> None:
+        """選択したゲームパッドのデバイス名を設定に保存する."""
+        settings = self.setting.setting
+        if settings is not None:
+            settings["gamepad_device_name"] = name
 
     def pause_controller(self) -> None:
         paused = self.actionPauseController.isChecked()
@@ -1464,7 +1563,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.logger.info("コントローラ入力を一時停止します")
         else:
             self.logger.info("コントローラ入力を再開します")
-        self.request_gamepad_pause.emit(paused)
+        if self.gamepad_worker is not None:
+            self.gamepad_worker.set_paused(paused)
 
     def show_serial(self) -> None:
         settings = self.setting.setting
@@ -1689,8 +1789,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self.command_session is not None:
             self.command_session.on_python_stopped(result)
         else:
-            self.request_gamepad_pause.emit(False)
-            self.request_capture_frame_stream.emit(False)
+            if self.gamepad_worker is not None:
+                self.gamepad_worker.set_paused(False)
+            if self.slot_manager and self.slot_manager.active_slot:
+                self.slot_manager.active_slot.set_frame_stream_enabled(False)
             self._sync_command_buttons()
 
     def start_mcu_command(self) -> None:
@@ -1810,21 +1912,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._set_button_checked(name, False)
         self.request_serial_button_released.emit(name)
 
-    @Slot(int)
-    def handle_camera_selection_changed(self, index: int) -> None:
-        if not hasattr(self, "camera_list"):
-            return
-        if index < 0 or index >= len(self.camera_list):
-            return
-
-        selected = self.camera_list[index]
-        cam_index = int(selected["index"])
-
-        self.lineEditCameraID.setText(str(cam_index))
-        self.request_capture_reopen.emit(cam_index)
-
-        self.logger.info(f"Selected camera: {selected['name']} (index={cam_index})")
-
     @Slot(str)
     def handle_gamepad_button_pressed(self, name: str) -> None:
         self._set_button_checked(name, True)
@@ -1921,7 +2008,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             raise RuntimeError("Settings are not loaded.")
 
         enabled = bool(settings["key_config"]["joystick"]["direction"]["LStick"])
-        self.request_gamepad_set_l_stick.emit(enabled)
+        if self.gamepad_worker is not None:
+            self.gamepad_worker.set_use_lstick(enabled)
 
     def gamepad_r_stick(self) -> None:
         settings = self.setting.setting
@@ -1929,7 +2017,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             raise RuntimeError("Settings are not loaded.")
 
         enabled = bool(settings["key_config"]["joystick"]["direction"]["RStick"])
-        self.request_gamepad_set_r_stick.emit(enabled)
+        if self.gamepad_worker is not None:
+            self.gamepad_worker.set_use_rstick(enabled)
+
+    def _sync_gamepad_stick_flags(self) -> None:
+        """設定から LStick/RStick フラグを GamepadPoller に反映する."""
+        settings = self.setting.setting
+        if settings is None or self.gamepad_worker is None:
+            return
+        js = settings["key_config"]["joystick"]["direction"]
+        self.gamepad_worker.set_use_lstick(bool(js.get("LStick", False)))
+        self.gamepad_worker.set_use_rstick(bool(js.get("RStick", False)))
 
     # ------------------------------------------------------------------
     # image / logging / utility
@@ -2575,6 +2673,25 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # ---- プレビュー開始 ----
         self.multi_slot_view.start_preview()
 
+    def _build_keymap_from_settings(self) -> dict[str, str]:
+        """settings.toml の key_config から {physical_key: logical_name} を生成する."""
+        settings = self.setting.setting
+        if settings is None:
+            return {}
+
+        js = settings["key_config"]["joystick"]
+        km: dict[str, str] = {}
+
+        for logical_name, cfg in js["button"].items():
+            if cfg.get("state") and cfg.get("assign"):
+                km[str(cfg["assign"])] = str(logical_name)
+
+        for logical_name, cfg in js["hat"].items():
+            if cfg.get("state") and cfg.get("assign"):
+                km[str(cfg["assign"])] = str(logical_name)
+
+        return km
+
     # ------------------------------------------------------------------
     # shutdown
     # ------------------------------------------------------------------
@@ -2608,8 +2725,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.stop_command(block=True)
 
         # 3. gamepad stop
-        self.request_gamepad_pause.emit(True)
-        self.request_gamepad_stop.emit()
+        if self.gamepad_worker is not None:
+            self.gamepad_worker.stop()
 
         # ★ 3.5. アクティブスロットのシグナル接続を切断
         self._disconnect_active_worker_signals()
@@ -2620,11 +2737,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         if self.slot_manager is not None:
             self.slot_manager.shutdown_all()
-
-        # 7. gamepad thread quit/wait
-        if self.gamepad_thread is not None:
-            self.gamepad_thread.quit()
-            self.gamepad_thread.wait(3000)
 
         # 8. Visual Macro dock 状態保存
         self._save_visual_macro_dock_state()
