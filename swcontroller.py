@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from importlib.resources import files
+
 import logging
 import os
 import sys
@@ -10,6 +12,13 @@ from PySide6.QtWidgets import QApplication
 from mainwindow import MainWindow
 
 
+def _load_style() -> str:
+    try:
+        return (files("ui") / "style.qss").read_text(encoding="utf-8")
+    except Exception:
+        return ""
+
+
 def main() -> int:
     logger = logging.getLogger(__name__)
 
@@ -18,14 +27,8 @@ def main() -> int:
     os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = plugin_path
 
     try:
-        with open("ui/style.qss", "r", encoding="utf-8") as f:
-            style = f.read()
-    except Exception:
-        style = ""
-
-    try:
         app = QApplication(sys.argv)
-        app.setStyleSheet(style)
+        app.setStyleSheet(_load_style())
         window = MainWindow()
         window.show()
         return app.exec()

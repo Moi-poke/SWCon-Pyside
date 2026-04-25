@@ -18,6 +18,7 @@ dependencies = [
     "numpy>=2.2.6",
     "opencv-python>=4.13.0.92",
     "pillow>=12.2.0",
+    "platformdirs>=4.9.6",
     "pygame>=2.6.1",
     "pykakasi>=2.3.0",
     "pyserial>=3.5",
@@ -26,6 +27,7 @@ dependencies = [
     "requests>=2.33.1",
     "scipy>=1.15.3",
     "toml>=0.10.2",
+    "tomli>=2.4.1",
 ]
 
 
