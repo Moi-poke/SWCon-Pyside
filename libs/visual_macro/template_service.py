@@ -4,65 +4,98 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from typing import Optional
 
-_TEMPLATE_EXTENSIONS: Final[frozenset[str]] = frozenset(
-    {".png", ".jpg", ".jpeg", ".bmp", ".webp"}
-)
+import cv2
+import numpy as np
+
+from libs.template_repository import TemplateRepository
 
 
 @dataclass(slots=True, frozen=True)
 class TemplateEntry:
-    """Metadata for a template image file."""
+    """Metadata for a template image file shown in the UI."""
 
     name: str
     relative_path: str
+    source_kind: str = ""
 
 
 class TemplateService:
-    """Provide access to template image files under the project's template directory."""
+    """Provide access to template images through TemplateRepository.
 
-    def __init__(self, template_dir: Path | None = None) -> None:
+    Design:
+    - TemplateRepository owns the actual resolution policy:
+        user -> builtin -> dev fallback
+    - TemplateService is a thin adapter for UI / bridge use.
+    """
+
+    def __init__(
+        self,
+        template_dir: Path | None = None,
+        repository: TemplateRepository | None = None,
+    ) -> None:
         """Initialize the service.
 
         Args:
-            template_dir: Optional explicit template directory. If omitted, the
-                project-root ``template`` directory is used.
+            template_dir:
+                Optional explicit writable user template directory.
+                This is kept mainly for compatibility.
+            repository:
+                Optional explicit repository instance. If provided, it wins.
         """
-        self._template_dir: Path = template_dir or self._default_template_dir()
+        if repository is not None:
+            self._repository = repository
+        else:
+            self._repository = TemplateRepository(base_dir=template_dir)
 
     @property
     def template_dir(self) -> Path:
-        """Return the template directory path."""
-        return self._template_dir
+        """Return the writable user template directory.
 
-    def list_templates(self) -> list:
-        """Return all template files under the template directory.
-
-        Returns:
-            A sorted list of template metadata entries.
+        This preserves the old property contract, but callers should prefer
+        higher-level methods such as ``list_templates`` and ``read_bytes``.
         """
-        if not self._template_dir.exists() or not self._template_dir.is_dir():
-            return []
+        return self._repository.base_dir
 
+    @property
+    def repository(self) -> TemplateRepository:
+        """Expose the underlying repository."""
+        return self._repository
+
+    def list_templates(self) -> list[TemplateEntry]:
+        """Return all visible template files.
+
+        The list is already merged by repository precedence:
+        user > builtin > dev fallback.
+        """
         entries: list[TemplateEntry] = []
-        for file_path in sorted(self._template_dir.rglob("*")):
-            if not file_path.is_file():
-                continue
-            if file_path.suffix.lower() not in _TEMPLATE_EXTENSIONS:
-                continue
-
-            relative_path: str = file_path.relative_to(self._template_dir).as_posix()
+        for entry in self._repository.list_entries():
             entries.append(
                 TemplateEntry(
-                    name=file_path.name,
-                    relative_path=relative_path,
+                    name=entry.display_name or Path(entry.relative_path).name,
+                    relative_path=entry.relative_path,
+                    source_kind=entry.source_kind,
                 )
             )
-
         return entries
 
-    @staticmethod
-    def _default_template_dir() -> Path:
-        """Resolve the default project template directory."""
-        return Path(__file__).resolve().parents[2] / "template"
+    def exists(self, relative_path: str) -> bool:
+        """Return whether a template exists in any source layer."""
+        return self._repository.exists(relative_path)
+
+    def read_bytes(self, relative_path: str) -> bytes:
+        """Read template bytes from user / builtin / dev sources."""
+        return self._repository.read_bytes(relative_path)
+
+    def read_image(
+        self,
+        relative_path: str,
+        flags: int = cv2.IMREAD_COLOR,
+    ) -> Optional[np.ndarray]:
+        """Read template image as OpenCV ndarray."""
+        return self._repository.read_image(relative_path, flags=flags)
+
+    def to_relative_path(self, path: str | Path) -> str:
+        """Normalize a path into repository-relative form."""
+        return self._repository.to_relative_path(path)

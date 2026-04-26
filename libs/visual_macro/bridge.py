@@ -320,26 +320,12 @@ class VisualMacroBridge(QObject):
 
     @Slot(str, result=str)
     def get_template_preview_base64(self, template_relative_path: str) -> str:
-        """Return a template image as a base64-encoded string.
-
-        Uses ``TemplateService.template_dir`` to resolve the file path.
-        The service does not expose a dedicated resolve helper, so we
-        resolve manually and apply a path-traversal safety check.
-        """
+        """Return a template image as a base64-encoded string."""
         try:
             if not template_relative_path:
                 return ""
 
-            base_dir: Path = self._template_service.template_dir.resolve()
-            candidate: Path = (base_dir / template_relative_path).resolve()
-
-            if base_dir not in candidate.parents and candidate != base_dir:
-                return ""
-
-            if not candidate.is_file():
-                return ""
-
-            raw_bytes = candidate.read_bytes()
+            raw_bytes = self._template_service.read_bytes(template_relative_path)
             return base64.b64encode(raw_bytes).decode("ascii")
         except Exception:
             return ""

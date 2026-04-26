@@ -25,6 +25,7 @@ from PySide6.QtGui import QColor
 
 from libs.enums import ColorType
 from libs.keys import Button, Direction, Hat
+from libs.template_repository import TemplateRepository
 
 
 DEBUG = True
@@ -49,16 +50,20 @@ class CommandBase(QObject):
     line_img = Signal(str, str, object)
 
     CAPTURE_DIR = "./ScreenShot"
-    TEMPLATE_PATH = "./template/"
+    TEMPLATE_PATH = (
+        "./template/"  # legacy fallback only; direct path resolution is deprecated
+    )
     __directory__ = "./Commands/Python"
     __tool_tip__ = None
     __key__ = None
 
     def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
+
         self._latest_frame: Optional[np.ndarray] = None
         self._frame_lock = threading.Lock()
         self._runtime_context = None
+        self._template_repository: Optional[TemplateRepository] = None
         self.__isCanceled = False
         self.__KeyBoardMode = None
         self.__KeyBoardMode_buff = None
@@ -66,6 +71,40 @@ class CommandBase(QObject):
 
     def set_runtime_context(self, context) -> None:
         self._runtime_context = context
+
+        # 任意: runtime context 側が template_repository を提供していれば使う
+        if context is not None and hasattr(context, "template_repository"):
+            try:
+                repo = context.template_repository
+                if repo is not None:
+                    self._template_repository = repo
+            except Exception:
+                pass
+
+    def _get_template_repository(self) -> TemplateRepository:
+        """Return the template repository used by this command.
+
+        Resolution order:
+        1. explicitly cached repository
+        2. runtime_context.template_repository (if available)
+        3. lazily create a local repository instance
+        """
+        if self._template_repository is not None:
+            return self._template_repository
+
+        if self._runtime_context is not None and hasattr(
+            self._runtime_context, "template_repository"
+        ):
+            try:
+                repo = self._runtime_context.template_repository
+                if repo is not None:
+                    self._template_repository = repo
+                    return repo
+            except Exception:
+                pass
+
+        self._template_repository = TemplateRepository()
+        return self._template_repository
 
     def __post_init__(self) -> None:
         return None
@@ -234,7 +273,6 @@ class CommandBase(QObject):
             return self._runtime_context.slot_id
         return 0
 
-
     def matching_image_in_the_template_listing(
         self,
         template_path_list: list[str],
@@ -302,12 +340,36 @@ class CommandBase(QObject):
 
         return results
 
-    def read_template(self, template_path: str) -> Optional[np.ndarray]:
-        full_path = pathlib.Path(self.TEMPLATE_PATH) / template_path
-        img = cv2.imread(str(full_path), cv2.IMREAD_COLOR)
-        if img is None:
-            self.error(f"テンプレート画像の読み込みに失敗しました: {full_path}")
-        return img
+    def read_template(self, template_path: str | pathlib.Path) -> Optional[np.ndarray]:
+        """Read template image through TemplateRepository.
+
+        The template path is treated as a logical repository-relative path such as:
+        - battle/common/hp_bar.png
+        - community_pack/menu/confirm.png
+        """
+        try:
+            repo = self._get_template_repository()
+
+            if isinstance(template_path, pathlib.Path):
+                relative_path = repo.to_relative_path(template_path)
+            else:
+                relative_path = repo.to_relative_path(template_path)
+
+            img = repo.read_image(relative_path, flags=cv2.IMREAD_COLOR)
+            if img is None:
+                self.error(f"テンプレート画像のデコードに失敗しました: {relative_path}")
+                return None
+
+            return img
+
+        except FileNotFoundError:
+            self.error(f"テンプレート画像が見つかりません: {template_path}")
+            return None
+        except Exception as exc:
+            self.error(
+                f"テンプレート画像の読み込みに失敗しました: {template_path} ({exc})"
+            )
+            return None
 
     def is_contain_template(
         self,
@@ -339,14 +401,8 @@ class CommandBase(QObject):
         if trim is not None:
             src = src[trim[1] : trim[3], trim[0] : trim[2]]
 
-        if isinstance(template_path, pathlib.Path):
-            template_file = template_path
-        else:
-            template_file = pathlib.Path(self.TEMPLATE_PATH) / template_path
-
-        template = cv2.imread(str(template_file), cv2.IMREAD_COLOR)
+        template = self.read_template(template_path)
         if template is None:
-            self.error(f"テンプレート画像の読み込みに失敗しました: {template_file}")
             return False
 
         template = self.set_img_color_type(template, color_mode, binary_threshold)

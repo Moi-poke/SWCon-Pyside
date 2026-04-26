@@ -54,6 +54,11 @@ from libs.visual_macro.repository import VisualMacroRepository
 from ui.main_ui import Ui_MainWindow
 from ui.QtextLogger import QPlainTextEditLogger
 
+try:
+    from platformdirs import user_data_path as _platform_user_data_path  # type: ignore
+except Exception:
+    _platform_user_data_path = None
+
 VERSION = "0.9.2 (beta)"
 Author = "Moi"
 
@@ -589,8 +594,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self._set_visual_macro_combo_index_safely(index)
 
     def open_visual_macro_dir(self) -> None:
-        target = str(self.visual_macro_repository.base_dir.resolve())
-        self._open_path(target)
+        target_path = self.visual_macro_repository.base_dir.resolve()
+        target_path.mkdir(parents=True, exist_ok=True)
+        self._open_path(str(target_path))
 
     def open_selected_visual_macro_in_editor(self) -> None:
         self.assign_command()
@@ -2086,26 +2092,120 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         )
         self._open_path(target)
 
+    def _fallback_user_data_dir(self, app_name: str) -> Path:
+        """platformdirs が使えない場合の user data dir fallback."""
+        if os.name == "nt":
+            base = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
+            return Path(base) / app_name
+        if os.name == "posix" and "darwin" in sys.platform.lower():
+            return Path.home() / "Library" / "Application Support" / app_name
+
+        base = os.environ.get("XDG_DATA_HOME")
+        if base:
+            return Path(base) / app_name
+        return Path.home() / ".local" / "share" / app_name
+
+    def _user_app_data_dir(self) -> Path:
+        """SWCon-Pyside の user data dir を返す."""
+        app_name = "SWCon-Pyside"
+
+        if _platform_user_data_path is not None:
+            try:
+                root = Path(
+                    _platform_user_data_path(
+                        app_name,
+                        appauthor=False,
+                        ensure_exists=True,
+                    )
+                )
+            except TypeError:
+                root = Path(_platform_user_data_path(app_name))
+        else:
+            root = self._fallback_user_data_dir(app_name)
+
+        return root.resolve()
+
+    def _user_python_commands_dir(self) -> Path:
+        """ユーザー配置用の Python commands ディレクトリを返す."""
+        return (self._user_app_data_dir() / "Commands" / "Python").resolve()
+
+    def _user_mcu_commands_dir(self) -> Path:
+        """ユーザー配置用の MCU commands ディレクトリを返す."""
+        return (self._user_app_data_dir() / "Commands" / "MCU").resolve()
+
     def open_python_shot_dir(self) -> None:
-        if self.cur_command is None:
+        """選択中 Python コマンドの実体フォルダ、または user commands dir を開く."""
+        self.assign_command()
+
+        descriptor = self.current_python_descriptor
+        if descriptor is None:
+            self.logger.error("No Python command is selected.")
             return
-        self._open_path(
-            os.path.realpath(Path(self.cur_command.__directory__).resolve().parent)
-        )
+
+        try:
+            source_path = Path(descriptor.source_path)
+
+            # 実在する絶対パスなら、その場所を優先して開く
+            if source_path.is_absolute() and source_path.exists():
+                target_path = (
+                    source_path.parent if source_path.is_file() else source_path
+                )
+            else:
+                # builtin / 非filesystem source / 相対 legacy source は user dir にフォールバック
+                target_path = self._user_python_commands_dir()
+                target_path.mkdir(parents=True, exist_ok=True)
+
+            self._open_path(str(target_path.resolve()))
+
+        except Exception as exc:
+            self.logger.error(f"Failed to open Python command directory: {exc}")
+            QMessageBox.warning(
+                self,
+                "Python Command",
+                f"Python コマンドのフォルダを開けませんでした。\n{exc}",
+            )
 
     def open_mcu_shot_dir(self) -> None:
-        if self.cur_command is None:
+        """選択中 MCU コマンドの実体フォルダ、または user MCU commands dir を開く."""
+        self.assign_command()
+
+        descriptor = self.current_mcu_descriptor
+        if descriptor is None:
+            self.logger.error("No MCU command is selected.")
             return
-        self._open_path(os.path.realpath(self.cur_command.__directory__))
+
+        try:
+            source_path = Path(descriptor.source_path)
+
+            # 実在する絶対パスなら、その場所を優先して開く
+            if source_path.is_absolute() and source_path.exists():
+                target_path = (
+                    source_path.parent if source_path.is_file() else source_path
+                )
+            else:
+                # builtin / 非filesystem source / 相対 legacy source は user dir にフォールバック
+                target_path = self._user_mcu_commands_dir()
+                target_path.mkdir(parents=True, exist_ok=True)
+
+            self._open_path(str(target_path.resolve()))
+
+        except Exception as exc:
+            self.logger.error(f"Failed to open MCU command directory: {exc}")
+            QMessageBox.warning(
+                self,
+                "MCU Command",
+                f"MCU コマンドのフォルダを開けませんでした。\n{exc}",
+            )
 
     def _open_path(self, target: str) -> None:
         try:
+            self.logger.debug(f"Opening path: {target}")
             if hasattr(os, "startfile"):
                 os.startfile(target)
             else:
                 self.logger.info(f"Open path manually: {target}")
         except Exception as exc:
-            self.logger.error(exc)
+            self.logger.error(f"Failed to open path: {target} ({exc})")
 
     @staticmethod
     def message_show_available_com_port() -> None:
