@@ -1533,7 +1533,7 @@ export function registerVisualMacroBlocks() {
       this.setWarningText(
         ok ? null : "⚠ このブロックはループ内でのみ使用できます。",
       );
-      this.setEnabled(ok);
+      this.setDisabledReason(!ok, "invalid-loop-context");
     },
   };
   Blockly.Blocks.vm_continue = {
@@ -1551,7 +1551,7 @@ export function registerVisualMacroBlocks() {
       this.setWarningText(
         ok ? null : "⚠ このブロックはループ内でのみ使用できます。",
       );
-      this.setEnabled(ok);
+      this.setDisabledReason(!ok, "invalid-loop-context");
     },
   };
   Blockly.Blocks.vm_return = {
@@ -1569,7 +1569,7 @@ export function registerVisualMacroBlocks() {
       this.setWarningText(
         ok ? null : "⚠ このブロックは関数定義内でのみ使用できます。",
       );
-      this.setEnabled(ok);
+      this.setDisabledReason(!ok, "invalid-loop-context");
     },
   };
   Blockly.Blocks.vm_function_param = {

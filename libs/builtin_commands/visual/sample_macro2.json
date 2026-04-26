@@ -1,0 +1,151 @@
+{
+  "format": "visual_macro_document",
+  "version": "1.0",
+  "metadata": {
+    "name": "さんぷる",
+    "description": "AがあったらBを押して、そうでなかったらAを押す",
+    "tags": []
+  },
+  "workspace": {
+    "blocks": {
+      "languageVersion": 0,
+      "blocks": [
+        {
+          "type": "vm_wait",
+          "id": "f|1@`5h|/CaCZx#+1W:j",
+          "x": 383,
+          "y": 267,
+          "fields": {
+            "SECONDS": 0.2
+          },
+          "next": {
+            "block": {
+              "type": "vm_while_alive",
+              "id": "XO);=TDM9cm6.|@p:mwu",
+              "inputs": {
+                "BODY": {
+                  "block": {
+                    "type": "vm_if",
+                    "id": "h%_bDrY#N:GtZ2bK12Fd",
+                    "inputs": {
+                      "CONDITION": {
+                        "block": {
+                          "type": "vm_image_exists",
+                          "id": "E2(-nf(/~r|zOQ%[@{J%",
+                          "fields": {
+                            "TEMPLATE": "a.png",
+                            "THRESHOLD": 0.95,
+                            "USE_GRAY": true
+                          }
+                        }
+                      },
+                      "THEN": {
+                        "block": {
+                          "type": "vm_press",
+                          "id": "H;F?@xg.T4]|%m2,v{`T",
+                          "fields": {
+                            "BUTTON": "B",
+                            "DURATION": 0.2,
+                            "WAIT": 0.3
+                          },
+                          "next": {
+                            "block": {
+                              "type": "vm_print",
+                              "id": "89d4MY$t2mr#6m@p|P3U",
+                              "fields": {
+                                "MESSAGE": "Bボタン"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "ELSE": {
+                        "block": {
+                          "type": "vm_press",
+                          "id": "Q=LSOm]JiCgl|(/~9aL1",
+                          "fields": {
+                            "BUTTON": "A",
+                            "DURATION": 0.2,
+                            "WAIT": 0.3
+                          },
+                          "next": {
+                            "block": {
+                              "type": "vm_print",
+                              "id": "+{rPE)F+ZIlG6XIP|h*c",
+                              "fields": {
+                                "MESSAGE": "Aボタン"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "program": {
+    "version": "1.0",
+    "root": {
+      "type": "sequence",
+      "children": [
+        {
+          "type": "wait",
+          "seconds": 0.2,
+          "block_id": "f|1@`5h|/CaCZx#+1W:j"
+        },
+        {
+          "type": "while_alive",
+          "body": [
+            {
+              "type": "if",
+              "condition": {
+                "type": "image_exists",
+                "template": "a.png",
+                "threshold": 0.95,
+                "use_gray": true,
+                "block_id": "E2(-nf(/~r|zOQ%[@{J%"
+              },
+              "then": [
+                {
+                  "type": "press",
+                  "button": "B",
+                  "duration": 0.2,
+                  "wait": 0.3,
+                  "block_id": "H;F?@xg.T4]|%m2,v{`T"
+                },
+                {
+                  "type": "print",
+                  "message": "Bボタン",
+                  "block_id": "89d4MY$t2mr#6m@p|P3U"
+                }
+              ],
+              "else": [
+                {
+                  "type": "press",
+                  "button": "A",
+                  "duration": 0.2,
+                  "wait": 0.3,
+                  "block_id": "Q=LSOm]JiCgl|(/~9aL1"
+                },
+                {
+                  "type": "print",
+                  "message": "Aボタン",
+                  "block_id": "+{rPE)F+ZIlG6XIP|h*c"
+                }
+              ],
+              "block_id": "h%_bDrY#N:GtZ2bK12Fd"
+            }
+          ],
+          "block_id": "XO);=TDM9cm6.|@p:mwu"
+        }
+      ],
+      "block_id": null
+    }
+  }
+}

@@ -1,0 +1,331 @@
+{
+  "format": "visual_macro_document",
+  "version": "1.0",
+  "metadata": {
+    "name": "",
+    "description": "",
+    "tags": []
+  },
+  "workspace": {
+    "blocks": {
+      "languageVersion": 0,
+      "blocks": [
+        {
+          "type": "vm_repeat",
+          "id": "47Pn`c,kib{8@J3F2j#s",
+          "x": 1006,
+          "y": 115,
+          "fields": {
+            "COUNT": 3
+          },
+          "inputs": {
+            "BODY": {
+              "block": {
+                "type": "vm_press",
+                "id": "TRj@E#eul?;T~[!l35lj",
+                "fields": {
+                  "BUTTON": "A",
+                  "DURATION": 0.1,
+                  "WAIT": 0.1
+                },
+                "next": {
+                  "block": {
+                    "type": "vm_press",
+                    "id": "U$#*e;53)ilxd*$O?)jo",
+                    "fields": {
+                      "BUTTON": "B",
+                      "DURATION": 0.1,
+                      "WAIT": 0.1
+                    },
+                    "next": {
+                      "block": {
+                        "type": "vm_press",
+                        "id": "!CBat6}oYEf;U{0{dD1I",
+                        "fields": {
+                          "BUTTON": "X",
+                          "DURATION": 0.1,
+                          "WAIT": 0.1
+                        },
+                        "next": {
+                          "block": {
+                            "type": "vm_press",
+                            "id": "%S!T(ZU:%2El/l{=CJD?",
+                            "fields": {
+                              "BUTTON": "Y",
+                              "DURATION": 0.1,
+                              "WAIT": 0.1
+                            },
+                            "next": {
+                              "block": {
+                                "type": "vm_press",
+                                "id": ",AW)oIC4csGXr)L]mx/s",
+                                "fields": {
+                                  "BUTTON": "L",
+                                  "DURATION": 0.1,
+                                  "WAIT": 0.1
+                                },
+                                "next": {
+                                  "block": {
+                                    "type": "vm_press",
+                                    "id": "kgj!x,$0r3+AlYVGRUoK",
+                                    "fields": {
+                                      "BUTTON": "R",
+                                      "DURATION": 0.1,
+                                      "WAIT": 0.1
+                                    },
+                                    "next": {
+                                      "block": {
+                                        "type": "vm_press",
+                                        "id": "s/rAw/lY.XU,evM1?ns~",
+                                        "fields": {
+                                          "BUTTON": "ZL",
+                                          "DURATION": 0.1,
+                                          "WAIT": 0.1
+                                        },
+                                        "next": {
+                                          "block": {
+                                            "type": "vm_press",
+                                            "id": ":.*vv{LIkesRUexR9LI^",
+                                            "fields": {
+                                              "BUTTON": "ZR",
+                                              "DURATION": 0.1,
+                                              "WAIT": 0.1
+                                            },
+                                            "next": {
+                                              "block": {
+                                                "type": "vm_press",
+                                                "id": "$$$Ji`R!FbGr!IEm|Plf",
+                                                "fields": {
+                                                  "BUTTON": "PLUS",
+                                                  "DURATION": 0.1,
+                                                  "WAIT": 0.1
+                                                },
+                                                "next": {
+                                                  "block": {
+                                                    "type": "vm_press",
+                                                    "id": "q:|6~MK)fVDRU-+Q?%uz",
+                                                    "fields": {
+                                                      "BUTTON": "MINUS",
+                                                      "DURATION": 0.1,
+                                                      "WAIT": 0.1
+                                                    },
+                                                    "next": {
+                                                      "block": {
+                                                        "type": "vm_press",
+                                                        "id": "q!HlUZ}rQ^Qzvr{7A/g?",
+                                                        "fields": {
+                                                          "BUTTON": "LCLICK",
+                                                          "DURATION": 0.1,
+                                                          "WAIT": 0.1
+                                                        },
+                                                        "next": {
+                                                          "block": {
+                                                            "type": "vm_press",
+                                                            "id": "4JNU9g;}y{IdC)jLQZr;",
+                                                            "fields": {
+                                                              "BUTTON": "RCLICK",
+                                                              "DURATION": 0.1,
+                                                              "WAIT": 0.1
+                                                            },
+                                                            "next": {
+                                                              "block": {
+                                                                "type": "vm_press",
+                                                                "id": "+V$9P_C}+y$_58fH.Aiv",
+                                                                "fields": {
+                                                                  "BUTTON": "TOP",
+                                                                  "DURATION": 0.1,
+                                                                  "WAIT": 0.1
+                                                                },
+                                                                "next": {
+                                                                  "block": {
+                                                                    "type": "vm_press",
+                                                                    "id": "{t/~sXUB`w1Q|1ozSojq",
+                                                                    "fields": {
+                                                                      "BUTTON": "BTM",
+                                                                      "DURATION": 0.1,
+                                                                      "WAIT": 0.1
+                                                                    },
+                                                                    "next": {
+                                                                      "block": {
+                                                                        "type": "vm_press",
+                                                                        "id": "#btq2wMzUHQBz+e/h,lA",
+                                                                        "fields": {
+                                                                          "BUTTON": "LEFT",
+                                                                          "DURATION": 0.1,
+                                                                          "WAIT": 0.1
+                                                                        },
+                                                                        "next": {
+                                                                          "block": {
+                                                                            "type": "vm_press",
+                                                                            "id": "7`8~$Ts~2#1bDt!(E!iS",
+                                                                            "fields": {
+                                                                              "BUTTON": "RIGHT",
+                                                                              "DURATION": 0.1,
+                                                                              "WAIT": 0.1
+                                                                            }
+                                                                          }
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "program": {
+    "version": "1.0",
+    "root": {
+      "type": "sequence",
+      "children": [
+        {
+          "type": "repeat",
+          "count": 3,
+          "body": [
+            {
+              "type": "press",
+              "button": "A",
+              "duration": 0.1,
+              "wait": 0.1,
+              "block_id": "TRj@E#eul?;T~[!l35lj"
+            },
+            {
+              "type": "press",
+              "button": "B",
+              "duration": 0.1,
+              "wait": 0.1,
+              "block_id": "U$#*e;53)ilxd*$O?)jo"
+            },
+            {
+              "type": "press",
+              "button": "X",
+              "duration": 0.1,
+              "wait": 0.1,
+              "block_id": "!CBat6}oYEf;U{0{dD1I"
+            },
+            {
+              "type": "press",
+              "button": "Y",
+              "duration": 0.1,
+              "wait": 0.1,
+              "block_id": "%S!T(ZU:%2El/l{=CJD?"
+            },
+            {
+              "type": "press",
+              "button": "L",
+              "duration": 0.1,
+              "wait": 0.1,
+              "block_id": ",AW)oIC4csGXr)L]mx/s"
+            },
+            {
+              "type": "press",
+              "button": "R",
+              "duration": 0.1,
+              "wait": 0.1,
+              "block_id": "kgj!x,$0r3+AlYVGRUoK"
+            },
+            {
+              "type": "press",
+              "button": "ZL",
+              "duration": 0.1,
+              "wait": 0.1,
+              "block_id": "s/rAw/lY.XU,evM1?ns~"
+            },
+            {
+              "type": "press",
+              "button": "ZR",
+              "duration": 0.1,
+              "wait": 0.1,
+              "block_id": ":.*vv{LIkesRUexR9LI^"
+            },
+            {
+              "type": "press",
+              "button": "PLUS",
+              "duration": 0.1,
+              "wait": 0.1,
+              "block_id": "$$$Ji`R!FbGr!IEm|Plf"
+            },
+            {
+              "type": "press",
+              "button": "MINUS",
+              "duration": 0.1,
+              "wait": 0.1,
+              "block_id": "q:|6~MK)fVDRU-+Q?%uz"
+            },
+            {
+              "type": "press",
+              "button": "LCLICK",
+              "duration": 0.1,
+              "wait": 0.1,
+              "block_id": "q!HlUZ}rQ^Qzvr{7A/g?"
+            },
+            {
+              "type": "press",
+              "button": "RCLICK",
+              "duration": 0.1,
+              "wait": 0.1,
+              "block_id": "4JNU9g;}y{IdC)jLQZr;"
+            },
+            {
+              "type": "press",
+              "button": "TOP",
+              "duration": 0.1,
+              "wait": 0.1,
+              "block_id": "+V$9P_C}+y$_58fH.Aiv"
+            },
+            {
+              "type": "press",
+              "button": "BTM",
+              "duration": 0.1,
+              "wait": 0.1,
+              "block_id": "{t/~sXUB`w1Q|1ozSojq"
+            },
+            {
+              "type": "press",
+              "button": "LEFT",
+              "duration": 0.1,
+              "wait": 0.1,
+              "block_id": "#btq2wMzUHQBz+e/h,lA"
+            },
+            {
+              "type": "press",
+              "button": "RIGHT",
+              "duration": 0.1,
+              "wait": 0.1,
+              "block_id": "7`8~$Ts~2#1bDt!(E!iS"
+            }
+          ],
+          "block_id": "47Pn`c,kib{8@J3F2j#s"
+        }
+      ],
+      "block_id": null
+    }
+  }
+}

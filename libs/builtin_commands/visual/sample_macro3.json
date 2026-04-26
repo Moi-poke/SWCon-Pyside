@@ -1,0 +1,133 @@
+{
+  "format": "visual_macro_document",
+  "version": "1.0",
+  "metadata": {
+    "name": "さんぷる3",
+    "description": "Y, A, Xを3回ずつ入力",
+    "tags": []
+  },
+  "workspace": {
+    "blocks": {
+      "languageVersion": 0,
+      "blocks": [
+        {
+          "type": "vm_repeat",
+          "id": "tXUCIF-:(3UV0/,D%g=:",
+          "x": 626,
+          "y": 287,
+          "fields": {
+            "COUNT": 1
+          },
+          "inputs": {
+            "BODY": {
+              "block": {
+                "type": "vm_press",
+                "id": "$2,`T5Z[b$al`9^t)p_4",
+                "fields": {
+                  "BUTTON": "Y",
+                  "DURATION": 0.1,
+                  "WAIT": 0.2
+                }
+              }
+            }
+          },
+          "next": {
+            "block": {
+              "type": "vm_repeat",
+              "id": "8J_)#8w1CpU-H2mf__E;",
+              "fields": {
+                "COUNT": 2
+              },
+              "inputs": {
+                "BODY": {
+                  "block": {
+                    "type": "vm_press",
+                    "id": "F0*{@GK_p|4FnVU[u)vJ",
+                    "fields": {
+                      "BUTTON": "A",
+                      "DURATION": 0.1,
+                      "WAIT": 0.2
+                    }
+                  }
+                }
+              },
+              "next": {
+                "block": {
+                  "type": "vm_repeat",
+                  "id": "%V|xN1H+1]sW,FAHc))r",
+                  "fields": {
+                    "COUNT": 3
+                  },
+                  "inputs": {
+                    "BODY": {
+                      "block": {
+                        "type": "vm_press",
+                        "id": "bQ4c5%dQ2n{g?T#rvzOT",
+                        "fields": {
+                          "BUTTON": "X",
+                          "DURATION": 0.1,
+                          "WAIT": 0.2
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "program": {
+    "version": "1.0",
+    "root": {
+      "type": "sequence",
+      "children": [
+        {
+          "type": "repeat",
+          "count": 1,
+          "body": [
+            {
+              "type": "press",
+              "button": "Y",
+              "duration": 0.1,
+              "wait": 0.2,
+              "block_id": "$2,`T5Z[b$al`9^t)p_4"
+            }
+          ],
+          "block_id": "tXUCIF-:(3UV0/,D%g=:"
+        },
+        {
+          "type": "repeat",
+          "count": 2,
+          "body": [
+            {
+              "type": "press",
+              "button": "A",
+              "duration": 0.1,
+              "wait": 0.2,
+              "block_id": "F0*{@GK_p|4FnVU[u)vJ"
+            }
+          ],
+          "block_id": "8J_)#8w1CpU-H2mf__E;"
+        },
+        {
+          "type": "repeat",
+          "count": 3,
+          "body": [
+            {
+              "type": "press",
+              "button": "X",
+              "duration": 0.1,
+              "wait": 0.2,
+              "block_id": "bQ4c5%dQ2n{g?T#rvzOT"
+            }
+          ],
+          "block_id": "%V|xN1H+1]sW,FAHc))r"
+        }
+      ],
+      "block_id": null
+    }
+  }
+}

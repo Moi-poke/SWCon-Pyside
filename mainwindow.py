@@ -589,7 +589,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self._set_visual_macro_combo_index_safely(index)
 
     def open_visual_macro_dir(self) -> None:
-        target = os.path.realpath(ospath("Commands/Visual"))
+        target = str(self.visual_macro_repository.base_dir.resolve())
         self._open_path(target)
 
     def open_selected_visual_macro_in_editor(self) -> None:
@@ -674,7 +674,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def setup_visual_macro_editor(self) -> None:
         """Create and attach the Visual Macro editor dock."""
         dock = QDockWidget("Visual Macro", self)
-        editor = VisualMacroEditorWidget(parent=dock)
+        editor = VisualMacroEditorWidget(
+            visual_macro_dir=self.visual_macro_repository.base_dir, parent=dock
+        )
 
         dock.setObjectName("dockWidgetVisualMacro")
         dock.setWidget(editor)
@@ -850,17 +852,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         dock.activateWindow()
 
     def _find_visual_macro_index_by_source_path(self, source_path: str) -> int:
-        if self.command_catalog is None:
-            return -1
-
-        target = source_path.replace("\\", "/")
-        for index, descriptor in enumerate(self.command_catalog.visual_descriptors):
-            if descriptor.source_path.replace("\\", "/") == target:
-                return index
-        return -1
+        return self._find_visual_macro_combo_index_by_source_path(source_path)
 
     def _select_visual_macro_by_source_path(self, source_path: str) -> bool:
-        index = self._find_visual_macro_index_by_source_path(source_path)
+        index = self._find_visual_macro_combo_index_by_source_path(source_path)
         if index < 0:
             return False
 

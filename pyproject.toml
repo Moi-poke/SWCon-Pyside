@@ -48,3 +48,7 @@ include = ["libs*", "ui*"]
 
 [tool.setuptools.package-data]
 ui = ["*.qss", "*.ui", "visual_macro/*"]
+libs=[
+  "builtin_commands/visual/*.json",
+  "resources/*.toml",
+]

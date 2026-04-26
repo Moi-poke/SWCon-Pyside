@@ -6,18 +6,28 @@ import base64
 import json
 from collections.abc import Mapping
 from pathlib import Path
+from typing import Optional
 
 from PySide6.QtCore import QBuffer, QIODevice, QObject, Signal, Slot
 from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QFileDialog
 
 from libs.visual_macro.errors import VisualMacroValidationError
+from libs.visual_macro.repository import VisualMacroRepository
 from libs.visual_macro.schema import parse_program_json
 from libs.visual_macro.template_service import TemplateService
 
 
 class VisualMacroBridge(QObject):
-    """Bridge object exposed to the web UI through QWebChannel."""
+    """Bridge object exposed to the web UI through QWebChannel.
+
+    Design:
+    - writable Visual Macro directory is represented by ``repository.base_dir``
+      (typically the user data dir)
+    - actual document loading is delegated to ``VisualMacroRepository`` so that
+      user / builtin / dev fallback resolution stays consistent with the rest of
+      the application
+    """
 
     run_requested = Signal(str)
     stop_requested = Signal()
@@ -30,13 +40,22 @@ class VisualMacroBridge(QObject):
         self,
         visual_macro_dir: Path,
         template_service: TemplateService | None = None,
+        repository: VisualMacroRepository | None = None,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
-        self._visual_macro_dir: Path = visual_macro_dir
+
         self._template_service: TemplateService = template_service or TemplateService()
-        self._visual_macro_dir.mkdir(parents=True, exist_ok=True)
         self._startup_document_path: str = ""
+
+        # Centralize document resolution / loading / saving policy here.
+        self._repository: VisualMacroRepository = repository or VisualMacroRepository(
+            base_dir=visual_macro_dir
+        )
+
+        # Keep a writable base-dir alias for compatibility / convenience.
+        self._visual_macro_dir: Path = self._repository.base_dir
+        self._visual_macro_dir.mkdir(parents=True, exist_ok=True)
 
     # ------------------------------------------------------------------
     # Template list
@@ -53,8 +72,8 @@ class VisualMacroBridge(QObject):
 
     @Slot(result=str)
     def get_visual_macro_base_dir(self) -> str:
-        """Return the base directory for visual macro documents."""
-        return str(self._visual_macro_dir.resolve())
+        """Return the writable base directory for visual macro documents."""
+        return str(self._repository.base_dir.resolve())
 
     # ------------------------------------------------------------------
     # Document state
@@ -80,29 +99,44 @@ class VisualMacroBridge(QObject):
 
     @Slot(str, result=str)
     def load_visual_macro_json(self, relative_path: str) -> str:
-        """Load a previously saved Visual Macro JSON file."""
+        """Load a previously saved Visual Macro JSON file.
+
+        Uses VisualMacroRepository so that user / builtin / dev fallback are
+        resolved consistently.
+        """
         try:
-            file_path: Path = self._resolve_safe_path(relative_path)
-            return file_path.read_text(encoding="utf-8")
+            normalized_relative_path = self._repository.to_relative_path(relative_path)
+            document = self._repository.load_document(normalized_relative_path)
+            return json.dumps(document, ensure_ascii=False, indent=2)
         except OSError as exc:
             self.ui_message.emit(f"Visual Macro load failed: {exc}")
             return ""
-        except ValueError as exc:
+        except (ValueError, FileNotFoundError) as exc:
             self.ui_message.emit(str(exc))
             return ""
 
     @Slot(str, str, result=bool)
     def save_visual_macro_json(self, relative_path: str, content: str) -> bool:
-        """Save Visual Macro JSON text to disk."""
+        """Save Visual Macro JSON text to disk.
+
+        Save target is always the writable repository base dir (user data dir).
+        """
         try:
-            file_path: Path = self._resolve_safe_path(relative_path)
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-            file_path.write_text(content, encoding="utf-8")
+            normalized_relative_path = self._repository.to_relative_path(relative_path)
+
+            raw_value = json.loads(content)
+            if not isinstance(raw_value, Mapping):
+                raise ValueError("Document root must be an object.")
+
+            self._repository.save_document(
+                normalized_relative_path,
+                dict(raw_value),
+            )
             return True
         except OSError as exc:
             self.ui_message.emit(f"Visual Macro save failed: {exc}")
             return False
-        except ValueError as exc:
+        except (ValueError, json.JSONDecodeError) as exc:
             self.ui_message.emit(str(exc))
             return False
 
@@ -166,13 +200,23 @@ class VisualMacroBridge(QObject):
     # ------------------------------------------------------------------
 
     def resolve_document_path(self, relative_path: str) -> Path:
-        """Resolve a document path under the visual macro directory."""
-        return self._resolve_safe_path(relative_path)
+        """Resolve a document path to the writable repository location.
+
+        This intentionally returns the user-writable canonical path, even if the
+        current document was originally loaded from builtin/dev fallback.
+        """
+        return self._repository.resolve_path(relative_path)
 
     @Slot(result=str)
     def choose_open_document_path(self) -> str:
-        """Open a file dialog and return a relative path under the visual macro dir."""
-        base_dir: Path = self._visual_macro_dir.resolve()
+        """Open a file dialog and return a relative path under the writable visual macro dir.
+
+        Note:
+            This dialog is intentionally scoped to the writable/user document dir.
+            Builtin documents are typically opened via startup path / catalog flow,
+            not via arbitrary filesystem browsing.
+        """
+        base_dir: Path = self._repository.base_dir.resolve()
         selected_path, _ = QFileDialog.getOpenFileName(
             None,
             "Visual Macro を開く",
@@ -183,20 +227,26 @@ class VisualMacroBridge(QObject):
             return ""
 
         try:
-            return self._absolute_to_relative_path(Path(selected_path))
+            return self._repository.to_relative_path(Path(selected_path))
         except ValueError as exc:
             self.ui_message.emit(str(exc))
             return ""
 
     @Slot(str, result=str)
     def choose_save_document_path(self, suggested_relative_path: str) -> str:
-        """Open a save dialog and return a relative path under the visual macro dir."""
-        base_dir: Path = self._visual_macro_dir.resolve()
+        """Open a save dialog and return a relative path under the writable visual macro dir."""
+        base_dir: Path = self._repository.base_dir.resolve()
 
+        initial_relative_path = "sample_macro.json"
         if suggested_relative_path:
-            initial_path = base_dir / suggested_relative_path
-        else:
-            initial_path = base_dir / "sample_macro.json"
+            try:
+                initial_relative_path = self._repository.to_relative_path(
+                    suggested_relative_path
+                )
+            except ValueError:
+                initial_relative_path = "sample_macro.json"
+
+        initial_path = base_dir / initial_relative_path
 
         selected_path, _ = QFileDialog.getSaveFileName(
             None,
@@ -212,7 +262,7 @@ class VisualMacroBridge(QObject):
             path_obj = path_obj.with_suffix(".json")
 
         try:
-            return self._absolute_to_relative_path(path_obj)
+            return self._repository.to_relative_path(path_obj)
         except ValueError as exc:
             self.ui_message.emit(str(exc))
             return ""
@@ -225,7 +275,7 @@ class VisualMacroBridge(QObject):
     def get_current_frame_base64(self) -> str:
         """Return the current capture frame as a base64-encoded PNG string.
 
-        Parent chain: Bridge → EditorWidget → QDockWidget → MainWindow
+        Parent chain: Bridge -> EditorWidget -> QDockWidget -> MainWindow
         MainWindow has ``frame_store: FrameStore``.
 
         Strategy:
@@ -250,7 +300,6 @@ class VisualMacroBridge(QObject):
             # --- Strategy 2: preview QImage (always available with camera) ---
             preview_image: QImage | None = frame_store.latest_preview_copy()
             if preview_image is not None and not preview_image.isNull():
-                # Ensure a standard pixel format for PNG encoding
                 if preview_image.format() != QImage.Format.Format_ARGB32:
                     preview_image = preview_image.convertToFormat(
                         QImage.Format.Format_ARGB32
@@ -284,7 +333,6 @@ class VisualMacroBridge(QObject):
             base_dir: Path = self._template_service.template_dir.resolve()
             candidate: Path = (base_dir / template_relative_path).resolve()
 
-            # path traversal guard
             if base_dir not in candidate.parents and candidate != base_dir:
                 return ""
 
@@ -305,9 +353,9 @@ class VisualMacroBridge(QObject):
 
         Expected chain:
             Bridge (self)
-            → VisualMacroEditorWidget  (parent in __init__)
-            → QDockWidget              (dock.setWidget(editor))
-            → MainWindow               (has frame_store: FrameStore)
+            -> VisualMacroEditorWidget  (parent in __init__)
+            -> QDockWidget              (dock.setWidget(editor))
+            -> MainWindow               (has frame_store: FrameStore)
         """
         obj = self.parent()
         while obj is not None:
@@ -319,31 +367,6 @@ class VisualMacroBridge(QObject):
                 else None
             )
         return None
-
-    def _resolve_safe_path(self, relative_path: str) -> Path:
-        """Resolve a safe file path under the Visual Macro directory."""
-        if not relative_path:
-            raise ValueError("Path must not be empty.")
-
-        candidate: Path = (self._visual_macro_dir / relative_path).resolve()
-        base_dir: Path = self._visual_macro_dir.resolve()
-
-        if base_dir not in candidate.parents and candidate != base_dir:
-            raise ValueError("Path traversal is not allowed.")
-
-        return candidate
-
-    def _absolute_to_relative_path(self, path: Path) -> str:
-        """Convert an absolute path to a safe relative path under the visual macro dir."""
-        candidate: Path = path.resolve()
-        base_dir: Path = self._visual_macro_dir.resolve()
-
-        if base_dir not in candidate.parents and candidate != base_dir:
-            raise ValueError(
-                "選択したファイルは Visual Macro ディレクトリ配下である必要があります。"
-            )
-
-        return candidate.relative_to(base_dir).as_posix()
 
     @staticmethod
     def _parse_document_json(content: str) -> Mapping[str, object]:
